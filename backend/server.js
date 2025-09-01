@@ -7,7 +7,6 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Validate required environment variables early to fail fast in misconfigured environments
 const requiredEnv = ['MONGO_URL', 'JWT_SECRET'];
 const missingEnv = requiredEnv.filter((k) => !process.env[k]);
 if (missingEnv.length) {
@@ -18,9 +17,7 @@ if (missingEnv.length) {
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
 const { generalLimiter } = require('./middleware/rateLimitMiddleware');
 
-app.use(cors(
-    { origin: 'http://localhost:5173', credentials: true }
-));
+
 app.use(express.json({ limit: '10mb' }));
 
 app.use(generalLimiter);

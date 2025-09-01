@@ -19,6 +19,9 @@ This repository contains the backend RESTful API for the MusicPlayer application
 ## Features
 
 - **User Authentication** (Register, Login) using JWT
+- **Mandatory 2FA**: All users must verify via email code for login and password changes
+- **Password Change**: Secure password updates with 2FA verification
+- **Profile Pictures**: Upload and retrieve user profile pictures (stored in MongoDB)
 - **Music Search** and **Track Details** via Jamendo API
 - **Popular Tracks** listing
 - **Favorites**: add/remove tracks
@@ -33,9 +36,11 @@ This repository contains the backend RESTful API for the MusicPlayer application
 - Node.js
 - Express.js
 - MongoDB (Mongoose)
-- **Redis** (for caching)
+- Redis (for caching)
 - JSON Web Tokens (jsonwebtoken)
 - Jamendo API (via axios)
+- Nodemailer (for email/2FA)
+- Multer (for file uploads)
 - Middleware: CORS, Rate Limiting, Validation, Error Handling
 
 ## Prerequisites
@@ -59,7 +64,6 @@ This repository contains the backend RESTful API for the MusicPlayer application
 
 ## Environment Variables
 
-Create a `.env` file in the `backend` folder with the following:
 Create a `.env` file in the `backend` folder with the following (examples):
 
 ```dotenv
@@ -82,6 +86,14 @@ REDIS_PASSWORD=<your-redis-password>
 PORT=5000
 # JAMENDO_CLIENT_ID is required if you use Jamendo features
 # JAMENDO_CLIENT_ID=<your-jamendo-client-id>
+
+# SMTP settings for 2FA emails
+SMTP_HOST=<your-smtp-host>
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=<your-smtp-username>
+SMTP_PASS=<your-smtp-password>
+SMTP_FROM=<your-smtp-from-email>
 ```
 
 Notes:
@@ -126,7 +138,8 @@ backend/
 │  └─ userRoutes.js
 ├─ services/          # External API integrations and other services
 │  ├─ jamendoService.js
-│  └─ cacheService.js  # Redis caching service
+│  ├─ cacheService.js  # Redis caching service
+│  └─ emailService.js  # Email service for 2FA
 ├─ server.js          # Entry point
 ├─ package.json
 └─ .env.example       # Example environment variables
@@ -138,10 +151,12 @@ Base URL: `/api`
 
 ### Auth
 
-| Method | Endpoint               | Description           |
-| ------ | ---------------------- | --------------------- |
-| POST   | `/auth/register`       | Register new user     |
-| POST   | `/auth/login`          | User login            |
+| Method | Endpoint               | Description                    |
+| ------ | ---------------------- | ------------------------------ |
+| POST   | `/auth/register`       | Register new user              |
+| POST   | `/auth/login`          | User login (returns 2FA code)  |
+| POST   | `/auth/verify-2fa`     | Verify 2FA code for login      |
+| POST   | `/auth/change-password`| Change password with 2FA       |
 
 ### Music
 
@@ -164,6 +179,8 @@ Base URL: `/api`
 | POST   | `/users/playlists`      | Create a new playlist (auth)              |
 | PUT    | `/users/playlists/:id`  | Update playlist name or tracks            |
 | DELETE | `/users/playlists/:id`  | Delete a playlist                         |
+| POST   | `/users/profile-picture`| Upload profile picture (auth)             |
+| GET    | `/users/profile-picture`| Get profile picture (auth)                |
 
 ## Caching Strategy
 
@@ -220,6 +237,14 @@ The API employs a robust error handling strategy to ensure consistent and inform
 
 This approach ensures that all errors are handled gracefully, providing a better experience for API consumers and aiding developers in diagnosing issues.
 
+## Security Features
+
+- **Mandatory 2FA**: All users must use email-based 2FA for login and password changes.
+- **Password Security**: Hashed with bcrypt, secure change process.
+- **JWT Authentication**: Stateless tokens with expiration.
+- **Rate Limiting**: Protects against abuse on auth and search endpoints.
+- **Input Validation**: Prevents injection and ensures data integrity.
+
 ---
 
-*README generated on June 26, 2025*
+*README updated on September 1, 2025*

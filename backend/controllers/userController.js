@@ -1,6 +1,11 @@
 const User = require('../models/User');
 const Playlist = require('../models/Playlist');
 const cache = require('../services/cacheService');
+const multer = require('multer');
+
+// Configure multer for profile picture uploads (store in memory)
+const storage = multer.memoryStorage();
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
 
 const updateUserAndClearCache = async (userId, update) => {
     await User.findByIdAndUpdate(userId, update);
@@ -105,6 +110,31 @@ const updatePlaylist = async (req, res) => {
     }
 };
 
+// Upload profile picture
+const uploadProfilePicture = async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+        const profilePictureBuffer = req.file.buffer;
+        const profilePictureType = req.file.mimetype;
+        await updateUserAndClearCache(req.user._id, { profilePicture: profilePictureBuffer, profilePictureType });
+        res.json({ message: 'Profile picture uploaded successfully' });
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to upload profile picture', error: err.message });
+    }
+};
+
+// Get profile picture
+const getProfilePicture = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('profilePicture profilePictureType');
+        if (!user || !user.profilePicture) return res.status(404).json({ message: 'Profile picture not found' });
+        res.set('Content-Type', user.profilePictureType);
+        res.send(user.profilePicture);
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to get profile picture', error: err.message });
+    }
+};
+
 module.exports = {
     addTrackToHistory,
     getUserHistory,
@@ -114,5 +144,7 @@ module.exports = {
     createPlaylist,
     getUserPlaylists,
     deletePlaylist,
-    updatePlaylist
+    updatePlaylist,
+    uploadProfilePicture,
+    getProfilePicture
 };

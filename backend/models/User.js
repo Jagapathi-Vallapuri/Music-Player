@@ -11,7 +11,11 @@ const userSchema = new mongoose.Schema({
         trackId: String,
         listenedAt: { type: Date, default: Date.now }
       }
-    ]
+    ],
+    twoFactorCode: { type: String },
+    twoFactorCodeExpires: { type: Date },
+    profilePicture: { type: Buffer }, 
+    profilePictureType: { type: String }
   });
 
   module.exports = mongoose.model('User', userSchema);  
