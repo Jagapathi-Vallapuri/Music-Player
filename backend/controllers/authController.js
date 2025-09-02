@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { send2FACode } = require('../services/emailService');
+const cache = require('../services/cacheService');
 
 const register = async (req, res) => {
     try {
@@ -62,12 +63,8 @@ const login = async (req, res) => {
             });
         }
 
-        // Always send 2FA code for all users
         const code = Math.floor(100000 + Math.random() * 900000).toString();
-        const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-        user.twoFactorCode = code;
-        user.twoFactorCodeExpires = expires;
-        await user.save();
+        await cache.set(`2fa:${user._id}`, code, 300);
         await send2FACode(user.email, code);
         return res.status(200).json({
             success: true,
@@ -84,35 +81,46 @@ const login = async (req, res) => {
     }
 };
 
-// 2FA verification endpoint
-const verify2FA = async (req, res) => {
+// Unified 2FA verification endpoint
+const verify2FAUnified = async (req, res) => {
     try {
-        const { email, code } = req.body;
+        const { email, code, type } = req.body;
+        if (!type || !['login', 'password-change'].includes(type)) {
+            return res.status(400).json({ success: false, message: 'Invalid or missing type. Must be "login" or "password-change"' });
+        }
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(400).json({ success: false, message: 'User not found' });
         }
-        if (!user.twoFactorCode || !user.twoFactorCodeExpires || user.twoFactorCodeExpires < new Date()) {
-            return res.status(400).json({ success: false, message: '2FA code expired or not generated' });
+        if (!(await verify2FACode(user._id, code))) {
+            return res.status(401).json({ success: false, message: 'Invalid or expired 2FA code' });
         }
-        if (user.twoFactorCode !== code) {
-            return res.status(401).json({ success: false, message: 'Invalid 2FA code' });
-        }
-        // Clear code after successful verification
-        user.twoFactorCode = null;
-        user.twoFactorCodeExpires = null;
-        await user.save();
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '2h' });
-        res.json({
-            success: true,
-            message: '2FA verification successful',
-            data: {
-                token,
-                user: { id: user._id, username: user.username, email: user.email }
+        
+        if (type === 'login') {
+            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '2h' });
+            return res.json({
+                success: true,
+                message: '2FA verification successful',
+                data: {
+                    token,
+                    user: { id: user._id, username: user.username, email: user.email }
+                }
+            });
+        } else if (type === 'password-change') {
+            // Apply pending password change
+            const pendingPassword = await cache.get(`pendingPassword:${user._id}`);
+            if (pendingPassword) {
+                user.password = pendingPassword;
+                await user.save();
+                await cache.del(`pendingPassword:${user._id}`);
             }
-        });
+            return res.json({
+                success: true,
+                message: 'Password change confirmed successfully'
+            });
+        }
     } catch (err) {
-        console.error('2FA verification error:', err);
+        console.error('Unified 2FA verification error:', err);
         res.status(500).json({ success: false, message: '2FA verification failed', error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error' });
     }
 };
@@ -131,15 +139,10 @@ const changePassword = async (req, res) => {
 
         // Generate 2FA code
         const code = Math.floor(100000 + Math.random() * 900000).toString();
-        const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-        user.twoFactorCode = code;
-        user.twoFactorCodeExpires = expires;
-        await user.save();
+        const expires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+        await cache.set(`2fa:${user._id}`, code, 300);
+        await cache.set(`pendingPassword:${user._id}`, await bcrypt.hash(newPassword, 10), 300);
         await send2FACode(user.email, code);
-
-        // Store new password temporarily (will be updated after 2FA)
-        user.password = await bcrypt.hash(newPassword, 10);
-        await user.save();
 
         res.json({ success: true, message: '2FA code sent to your email. Please verify to confirm password change.' });
     } catch (err) {
@@ -148,4 +151,24 @@ const changePassword = async (req, res) => {
     }
 };
 
-module.exports = { register, login, verify2FA, changePassword };
+// Helper function to verify 2FA code and set verified flag
+const verify2FACode = async (userId, code) => {
+    const storedCode = await cache.get(`2fa:${userId}`);
+    if (!storedCode || storedCode !== code) {
+        return false;
+    }
+    await cache.del(`2fa:${userId}`);
+    await set2FAVerified(userId);
+    return true;
+};
+
+const is2FAVerified = async (userId) => {
+    const verified = await cache.get(`2faVerified:${userId}`);
+    return verified === 'true';
+};
+
+const set2FAVerified = async (userId) => {
+    await cache.set(`2faVerified:${userId}`, 'true', 300);
+};
+
+module.exports = { register, login, verify2FAUnified, changePassword, is2FAVerified, set2FAVerified, verify2FACode };

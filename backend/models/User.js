@@ -12,10 +12,16 @@ const userSchema = new mongoose.Schema({
         listenedAt: { type: Date, default: Date.now }
       }
     ],
-    twoFactorCode: { type: String },
-    twoFactorCodeExpires: { type: Date },
     profilePicture: { type: Buffer }, 
-    profilePictureType: { type: String }
+    profilePictureType: { type: String },
+    uploadedSongs: [{
+      filename: { type: String, required: true },
+      originalName: { type: String, required: true },
+      size: { type: Number, required: true },
+      mimeType: { type: String, required: true },
+      uploadDate: { type: Date, default: Date.now },
+      gridfsId: { type: mongoose.Schema.Types.ObjectId }
+    }]
   });
 
   module.exports = mongoose.model('User', userSchema);  

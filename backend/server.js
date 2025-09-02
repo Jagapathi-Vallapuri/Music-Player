@@ -31,6 +31,9 @@ app.use('/api/music', musicRoutes);
 const userRoutes = require('./routes/userRoutes');
 app.use('/api/users', userRoutes);
 
+const songsRoutes = require('./routes/songsRoutes');
+app.use('/api/songs', songsRoutes);
+
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,

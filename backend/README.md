@@ -22,6 +22,7 @@ This repository contains the backend RESTful API for the MusicPlayer application
 - **Mandatory 2FA**: All users must verify via email code for login and password changes
 - **Password Change**: Secure password updates with 2FA verification
 - **Profile Pictures**: Upload and retrieve user profile pictures (stored in MongoDB)
+- **Song Uploads**: Users can upload their own audio files (stored in MongoDB GridFS)
 - **Music Search** and **Track Details** via Jamendo API
 - **Popular Tracks** listing
 - **Favorites**: add/remove tracks
@@ -35,12 +36,12 @@ This repository contains the backend RESTful API for the MusicPlayer application
 
 - Node.js
 - Express.js
-- MongoDB (Mongoose)
+- MongoDB (Mongoose + GridFS for file storage)
 - Redis (for caching)
 - JSON Web Tokens (jsonwebtoken)
 - Jamendo API (via axios)
 - Nodemailer (for email/2FA)
-- Multer (for file uploads)
+- Multer & Multer-GridFS-Storage (for file uploads)
 - Middleware: CORS, Rate Limiting, Validation, Error Handling
 
 ## Prerequisites
@@ -123,7 +124,8 @@ backend/
 ├─ controllers/       # Route handlers
 │  ├─ authController.js
 │  ├─ musicController.js
-│  └─ userController.js
+│  ├─ userController.js
+│  └─ songController.js     # NEW: Song upload handlers
 ├─ middleware/        # Custom middleware
 │  ├─ authMiddleware.js
 │  ├─ errorMiddleware.js
@@ -135,7 +137,8 @@ backend/
 ├─ routes/            # API route definitions
 │  ├─ authRoutes.js
 │  ├─ musicRoutes.js
-│  └─ userRoutes.js
+│  ├─ userRoutes.js
+│  └─ songsRoutes.js       # NEW: Song upload routes
 ├─ services/          # External API integrations and other services
 │  ├─ jamendoService.js
 │  ├─ cacheService.js  # Redis caching service
@@ -168,21 +171,37 @@ Base URL: `/api`
 
 ### User
 
-| Method | Endpoint              | Description                               |
-| ------ | --------------------- | ----------------------------------------- |
-| POST   | `/users/history`      | Add track to listening history (auth)     |
-| GET    | `/users/history`      | Get user listening history                |
-| GET    | `/users/favorites`      | Get user favorites (auth)                 |
-| POST   | `/users/favorites`      | Add track to favorites                    |
-| DELETE | `/users/favorites`      | Remove track from favorites               |
-| GET    | `/users/playlists`      | Get user playlists                        |
-| POST   | `/users/playlists`      | Create a new playlist (auth)              |
-| PUT    | `/users/playlists/:id`  | Update playlist name or tracks            |
-| DELETE | `/users/playlists/:id`  | Delete a playlist                         |
-| POST   | `/users/profile-picture`| Upload profile picture (auth)             |
-| GET    | `/users/profile-picture`| Get profile picture (auth)                |
+| Method | Endpoint                    | Description                               |
+| ------ | --------------------------- | ----------------------------------------- |
+| POST   | `/users/history`            | Add track to listening history (auth)     |
+| GET    | `/users/history`            | Get user listening history                |
+| GET    | `/users/favorites`          | Get user favorites (auth)                 |
+| POST   | `/users/favorites`          | Add track to favorites                    |
+| DELETE | `/users/favorites`          | Remove track from favorites               |
+| GET    | `/users/playlists`          | Get user playlists                        |
+| POST   | `/users/playlists`          | Create a new playlist (auth)              |
+| PUT    | `/users/playlists/:id`      | Update playlist name or tracks            |
+| DELETE | `/users/playlists/:id`      | Delete a playlist                         |
+| POST   | `/users/profile-picture`    | Upload profile picture (auth)             |
+| GET    | `/users/profile-picture`    | Get profile picture (auth)                |
 
-## Caching Strategy
+### Songs
+
+| Method | Endpoint                    | Description                               |
+| ------ | --------------------------- | ----------------------------------------- |
+| POST   | `/songs/upload`             | Upload a song file (auth, multipart)      |
+| GET    | `/songs`                    | Get user's uploaded songs                 |
+| DELETE | `/songs/:filename`          | Delete a specific song                    |
+| GET    | `/songs/stream/:filename`   | Stream a song file                        |
+
+## File Storage
+
+- **Profile Pictures**: Stored as binary data in MongoDB (User model).
+- **Uploaded Songs**: Stored using MongoDB GridFS, which automatically handles large files by breaking them into chunks:
+  - `uploads.files`: Metadata (filename, size, MIME type, etc.)
+  - `uploads.chunks`: File data in 255KB chunks
+- **Supported Formats**: MP3, WAV, OGG, MP4 (audio files only, max 50MB)
+- **Streaming**: Songs are streamed directly from GridFS for efficient playback
 
 - **Jamendo API Calls**: Responses from the Jamendo API (tracks, albums, popular) are cached in Redis to reduce external API calls and improve response times. Cache keys are generated based on query parameters.
 - **User Objects**: After successful authentication, user objects (excluding sensitive data like passwords) are cached. The authentication middleware (`verifyToken`) attempts to retrieve the user from the cache first before querying MongoDB. This speeds up subsequent authenticated requests.
@@ -235,16 +254,4 @@ The API employs a robust error handling strategy to ensure consistent and inform
       }
       ```
 
-This approach ensures that all errors are handled gracefully, providing a better experience for API consumers and aiding developers in diagnosing issues.
-
-## Security Features
-
-- **Mandatory 2FA**: All users must use email-based 2FA for login and password changes.
-- **Password Security**: Hashed with bcrypt, secure change process.
-- **JWT Authentication**: Stateless tokens with expiration.
-- **Rate Limiting**: Protects against abuse on auth and search endpoints.
-- **Input Validation**: Prevents injection and ensures data integrity.
-
 ---
-
-*README updated on September 1, 2025*

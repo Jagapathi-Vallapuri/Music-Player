@@ -7,9 +7,11 @@
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
     "express-validator": "^7.2.1",
+    "gridfs-stream": "^1.1.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.13.2",
     "multer": "^2.0.2",
+    "multer-gridfs-storage": "^5.0.2",
     "nodemailer": "^7.0.6",
     "redis": "^5.5.6"
   },
