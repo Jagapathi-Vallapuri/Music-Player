@@ -51,7 +51,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('Welcome to the Music App API');
+  res.send('Welcome to the Music App');
 });
 
 app.use(notFound);
