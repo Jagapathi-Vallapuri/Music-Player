@@ -3,7 +3,6 @@ const cache = require('./cacheService');
 const JAMENDO_API_BASE = 'https://api.jamendo.com/v3.0/';
 const CLIENT_ID = process.env.JAMENDO_CLIENT_ID;
 
-// Helper function to decode HTML entities
 const decodeHtmlEntities = (text) => {
     if (!text) return '';
     return text.replace(/&amp;/g, '&');
@@ -37,7 +36,7 @@ const searchTracks = (query) => {
             ...track,
             artist_name: decodeHtmlEntities(track.artist_name)
         }));
-    }, null, 3600); // 1 hour
+    }, null, 3600);
 };
 
 const getTrackById = (id) => {
@@ -56,7 +55,7 @@ const getTrackById = (id) => {
             track.artist_name = decodeHtmlEntities(track.artist_name);
         }
         return track;
-    }, null, 21600); // 6 hours
+    }, null, 21600);
 };
 
 const getPopular = () => {
@@ -84,7 +83,7 @@ const getPopular = () => {
             favorited: track.stats?.favorited || 0,
             likes: track.stats?.likes || 0,
         }
-    })), 1800); // 30 minutes
+    })), 1800);
 };
 
 const getAlbums = () => {
@@ -109,7 +108,7 @@ const getAlbums = () => {
             favorited: album.stats?.favorited || 0,
             likes: album.stats?.likes || 0,
         }
-    })), 3600); // 1 hour
+    })), 3600);
 };
 
 const getTracksByIds = (ids) => {
@@ -128,7 +127,7 @@ const getTracksByIds = (ids) => {
             ...track,
             artist_name: decodeHtmlEntities(track.artist_name)
         }));
-    }, null, 21600); // 6 hours
+    }, null, 21600);
 };
 
 module.exports = { searchTracks, getTrackById, getPopular, getAlbums, getTracksByIds };

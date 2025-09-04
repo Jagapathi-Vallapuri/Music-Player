@@ -20,6 +20,14 @@ const { generalLimiter } = require('./middleware/rateLimitMiddleware');
 
 app.use(express.json({ limit: '10mb' }));
 
+const corsOptions = {
+  origin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+app.use(cors(corsOptions));
+
 app.use(generalLimiter);
 
 const authRoutes = require('./routes/authRoutes');
@@ -50,7 +58,6 @@ app.use(notFound);
 app.use(errorHandler);
 
 mongoose.connect(process.env.MONGO_URL, {
-    dbName: "UserData",
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
 })

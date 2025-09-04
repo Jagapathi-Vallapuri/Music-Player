@@ -3,7 +3,6 @@ const Playlist = require('../models/Playlist');
 const cache = require('../services/cacheService');
 const multer = require('multer');
 
-// Configure multer for profile picture uploads (store in memory)
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
 
@@ -123,7 +122,6 @@ const uploadProfilePicture = async (req, res) => {
     }
 };
 
-// Get profile picture
 const getProfilePicture = async (req, res) => {
     try {
         const user = await User.findById(req.user._id).select('profilePicture profilePictureType');

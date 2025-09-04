@@ -4,7 +4,6 @@ const { uploadSong, getUserSongs, deleteSong, streamSong } = require('../control
 const verifyToken = require('../middleware/authMiddleware');
 const multer = require('multer');
 
-// Configure multer for GridFS storage
 const { GridFsStorage } = require('multer-gridfs-storage');
 
 const storage = new GridFsStorage({

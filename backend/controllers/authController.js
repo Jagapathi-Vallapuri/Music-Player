@@ -81,7 +81,6 @@ const login = async (req, res) => {
     }
 };
 
-// Unified 2FA verification endpoint
 const verify2FAUnified = async (req, res) => {
     try {
         const { email, code, type } = req.body;
@@ -107,7 +106,6 @@ const verify2FAUnified = async (req, res) => {
                 }
             });
         } else if (type === 'password-change') {
-            // Apply pending password change
             const pendingPassword = await cache.get(`pendingPassword:${user._id}`);
             if (pendingPassword) {
                 user.password = pendingPassword;
@@ -125,19 +123,16 @@ const verify2FAUnified = async (req, res) => {
     }
 };
 
-// Change password with 2FA
 const changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
         const user = await User.findById(req.user._id);
 
-        // Verify current password
         const isMatch = await bcrypt.compare(currentPassword, user.password);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: 'Current password is incorrect' });
         }
 
-        // Generate 2FA code
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         const expires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
         await cache.set(`2fa:${user._id}`, code, 300);
@@ -151,7 +146,6 @@ const changePassword = async (req, res) => {
     }
 };
 
-// Helper function to verify 2FA code and set verified flag
 const verify2FACode = async (userId, code) => {
     const storedCode = await cache.get(`2fa:${userId}`);
     if (!storedCode || storedCode !== code) {

@@ -18,7 +18,6 @@ router.post('/playlists', verifyToken, validatePlaylist, createPlaylist);
 router.put('/playlists/:id', verifyToken, validatePlaylistUpdate, updatePlaylist);
 router.delete('/playlists/:id', verifyToken, validatePlaylistId, deletePlaylist);
 
-// Profile picture routes
 router.post('/profile-picture', verifyToken, upload.single('profilePicture'), uploadProfilePicture);
 router.get('/profile-picture', verifyToken, getProfilePicture);
 

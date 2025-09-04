@@ -5,6 +5,10 @@ let gfs;
 
 conn.once('open', () => {
   gfs = Grid(conn.db, mongoose.mongo);
+  if (!gfs) {
+    console.error('Failed to initialize GridFS');
+    return;
+  }
   gfs.collection('uploads');
 });
 
@@ -52,7 +56,6 @@ const deleteSong = async (req, res) => {
     const { filename } = req.params;
     const user = await User.findById(req.user._id);
 
-    // Find and remove from database
     const songIndex = user.uploadedSongs.findIndex(song => song.filename === filename);
     if (songIndex === -1) {
       return res.status(404).json({ message: 'Song not found' });
@@ -60,7 +63,6 @@ const deleteSong = async (req, res) => {
 
     const song = user.uploadedSongs[songIndex];
 
-    // Delete from GridFS
     if (song.gridfsId) {
       gfs.remove({ _id: song.gridfsId, root: 'uploads' }, (err) => {
         if (err) console.error('GridFS delete error:', err);
@@ -81,13 +83,11 @@ const streamSong = async (req, res) => {
     const { filename } = req.params;
     const user = await User.findById(req.user._id);
 
-    // Check if user owns this song
     const song = user.uploadedSongs.find(song => song.filename === filename);
     if (!song || !song.gridfsId) {
       return res.status(404).json({ message: 'Song not found' });
     }
 
-    // Stream from GridFS
     const readstream = gfs.createReadStream({
       _id: song.gridfsId,
       root: 'uploads'
