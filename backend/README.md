@@ -125,133 +125,110 @@ backend/
 │  ├─ authController.js
 │  ├─ musicController.js
 │  ├─ userController.js
-│  └─ songController.js     # NEW: Song upload handlers
-├─ middleware/        # Custom middleware
-│  ├─ authMiddleware.js
-│  ├─ errorMiddleware.js
-│  ├─ rateLimitMiddleware.js
-│  └─ validationMiddleware.js
-├─ models/            # Mongoose schemas
-│  ├─ User.js
-│  └─ Playlist.js
-├─ routes/            # API route definitions
-│  ├─ authRoutes.js
-│  ├─ musicRoutes.js
-│  ├─ userRoutes.js
-│  └─ songsRoutes.js       # NEW: Song upload routes
-├─ services/          # External API integrations and other services
-│  ├─ jamendoService.js
-│  ├─ cacheService.js  # Redis caching service
-│  └─ emailService.js  # Email service for 2FA
-├─ server.js          # Entry point
-├─ package.json
-└─ .env.example       # Example environment variables
+# MusicPlayer — Backend
+
+This folder contains the backend REST API for the MusicPlayer app (Express + MongoDB + Redis). This README is a concise developer guide to get the backend running locally, explains the 2FA session flow, and includes operational and security notes.
+
+## Quick start
+
+- Copy or create a `.env` file in `backend/` (see Environment Variables).
+- Install dependencies and start the local dev server:
+
+```powershell
+cd backend
+npm install
+npm run dev
 ```
 
-## API Endpoints
+The API mounts under `/api` and defaults to port `5000` (configurable via `PORT`).
 
-Base URL: `/api`
+## Environment Variables
 
-### Auth
+Create a `.env` (or use environment secrets) containing at minimum:
 
-| Method | Endpoint               | Description                    |
-| ------ | ---------------------- | ------------------------------ |
-| POST   | `/auth/register`       | Register new user              |
-| POST   | `/auth/login`          | User login (returns 2FA code)  |
-| POST   | `/auth/verify-2fa`     | Verify 2FA code for login      |
-| POST   | `/auth/change-password`| Change password with 2FA       |
+```dotenv
+MONGO_URL=<mongodb-uri>
+JWT_SECRET=<strong-jwt-secret>
+REDIS_URL=redis://localhost:6379
+PORT=5000
 
-### Music
+# SMTP for 2FA emails
+SMTP_HOST=smtp.example.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=you@example.com
+SMTP_PASS=secret
+SMTP_FROM="MusicPlayer <no-reply@example.com>"
+```
 
-| Method | Endpoint                         | Description                                    |
-| ------ | -------------------------------- | ---------------------------------------------- |
-| GET    | `/music/search?q=<query>`       | Search tracks                                  |
-| GET    | `/music/track/:id`              | Get details for a specific track               |
-| GET    | `/music/popular`                | Fetch popular tracks                           |
+Notes:
+- The server validates required env vars at startup and will exit with a message if `MONGO_URL` or `JWT_SECRET` are missing.
+- Prefer `REDIS_URL` for cloud providers (use `rediss://` for TLS).
 
-### User
+## Running
 
-| Method | Endpoint                    | Description                               |
-| ------ | --------------------------- | ----------------------------------------- |
-| POST   | `/users/history`            | Add track to listening history (auth)     |
-| GET    | `/users/history`            | Get user listening history                |
-| GET    | `/users/favorites`          | Get user favorites (auth)                 |
-| POST   | `/users/favorites`          | Add track to favorites                    |
-| DELETE | `/users/favorites`          | Remove track from favorites               |
-| GET    | `/users/playlists`          | Get user playlists                        |
-| POST   | `/users/playlists`          | Create a new playlist (auth)              |
-| PUT    | `/users/playlists/:id`      | Update playlist name or tracks            |
-| DELETE | `/users/playlists/:id`      | Delete a playlist                         |
-| POST   | `/users/profile-picture`    | Upload profile picture (auth)             |
-| GET    | `/users/profile-picture`    | Get profile picture (auth)                |
+- Development (auto-reload): `npm run dev`
+- Production: `npm start`
 
-### Songs
+Use `POST /api/auth/register` and `POST /api/auth/login` to exercise authentication flows.
 
-| Method | Endpoint                    | Description                               |
-| ------ | --------------------------- | ----------------------------------------- |
-| POST   | `/songs/upload`             | Upload a song file (auth, multipart)      |
-| GET    | `/songs`                    | Get user's uploaded songs                 |
-| DELETE | `/songs/:filename`          | Delete a specific song                    |
-| GET    | `/songs/stream/:filename`   | Stream a song file                        |
+## Docker (local / CI)
 
-## File Storage
+A `Dockerfile` exists in this folder. To build and run locally:
 
-- **Profile Pictures**: Stored as binary data in MongoDB (User model).
-- **Uploaded Songs**: Stored using MongoDB GridFS, which automatically handles large files by breaking them into chunks:
-  - `uploads.files`: Metadata (filename, size, MIME type, etc.)
-  - `uploads.chunks`: File data in 255KB chunks
-- **Supported Formats**: MP3, WAV, OGG, MP4 (audio files only, max 50MB)
-- **Streaming**: Songs are streamed directly from GridFS for efficient playback
+```powershell
+cd backend
+docker build -t musicplayer-backend:local .
+docker run -p 5000:5000 --env-file .env musicplayer-backend:local
+```
 
-- **Jamendo API Calls**: Responses from the Jamendo API (tracks, albums, popular) are cached in Redis to reduce external API calls and improve response times. Cache keys are generated based on query parameters.
-- **User Objects**: After successful authentication, user objects (excluding sensitive data like passwords) are cached. The authentication middleware (`verifyToken`) attempts to retrieve the user from the cache first before querying MongoDB. This speeds up subsequent authenticated requests.
-- **Cache Invalidation**: For user objects, the cache is invalidated (cleared) upon write operations (e.g., adding a favorite, updating history, modifying playlists) to ensure data consistency. The next request for that user will fetch fresh data from MongoDB and re-cache it.
-- **TTL (Time-To-Live)**: Cached items have a defined TTL (e.g., 5 minutes for user objects, 1 hour for Jamendo API responses) after which they expire and are refetched on the next request.
+When deploying to a container platform, ensure your environment variables (esp. `MONGO_URL`, `REDIS_URL`, and `JWT_SECRET`) are set securely in the target environment.
 
-### Cache TTLs
+## 2FA session behavior (important)
 
-Current TTLs used by the application (seconds):
+This backend uses server-issued 2FA sessions for login:
 
-- User objects (cached in `authMiddleware`): 300 (5 minutes)
-- Jamendo search responses: 3600 (1 hour)
-- Jamendo single track: 21600 (6 hours)
-- Jamendo popular: 1800 (30 minutes)
-- Jamendo albums: 3600 (1 hour)
-- Jamendo tracks by IDs: 21600 (6 hours)
+- `POST /api/auth/login` authenticates credentials and, if valid, generates a short-lived server `sessionId` (UUID) and an email 6-digit code.
+- The code is stored in Redis at key `2fa:session:{sessionId}` with a TTL (short, e.g., 300s). The `sessionId` is returned to the client.
+- The client submits the code along with `sessionId` to `POST /api/auth/verify-2fa`.
+- Verification uses a Redis Lua script that atomically compares the stored code with the supplied one and deletes the key on success. This prevents race conditions and one-time reuse.
 
-You can tune these TTLs in `services/jamendoService.js` and `services/cacheService.js` to match your freshness/performance tradeoffs.
+Frontend behavior: clients should persist `sessionId` (e.g., `sessionStorage`) while awaiting the code so a page reload doesn’t break the flow.
 
-## Rate Limiting
+Security notes about 2FA:
+- Codes are short-lived, but currently stored server-side in Redis. For better security, consider storing a keyed HMAC of the code instead of plaintext.
+- Add a per-session attempt counter or rate-limiting to mitigate brute-force attempts.
 
-To protect the API from abuse and ensure fair usage, rate limiting is implemented using the `express-rate-limit` middleware. Different strategies are applied to various parts of the API:
+## Folder overview
 
-- **General Limiter**: Applied to all incoming requests to provide a baseline level of protection against rapid, repeated requests. This helps mitigate common DoS or brute-force attempts.
-  - *Configuration*: Typically allows a higher number of requests per IP address within a given time window (e.g., 100 requests per 15 minutes).
-- **Authentication Limiter (`authLimiter`)**: Specifically targets sensitive authentication routes like `/auth/register` and `/auth/login`. This helps prevent brute-force attacks on user credentials.
-  - *Configuration*: Allows a lower number of requests (e.g., 5-10 requests per 15 minutes per IP) to these specific endpoints.
-- **Search Limiter (`searchLimiter`)**: Applied to routes that interact with the external Jamendo API (e.g., `/music/search`). This protects our Jamendo API client ID from being overused and potentially blocked, and also helps manage costs if the external API has usage limits.
-  - *Configuration*: Configured with a moderate number of requests (e.g., 20-30 requests per 15 minutes per IP).
+Key folders and files:
 
-When a rate limit is exceeded, the API responds with a `429 Too Many Requests` HTTP status code and a message indicating that the limit has been hit. The `Retry-After` header may also be included to inform the client when they can try again.
+- `controllers/` — Express route handlers (e.g., `authController.js`)
+- `routes/` — Route wiring
+- `services/` — Integrations: `cacheService.js` (Redis), `emailService.js`, `jamendoService.js`
+- `models/` — Mongoose schemas (User, Playlist)
+- `middleware/` — auth, validation, rate limiting, error handling
+- `server.js` — app entrypoint
 
-## Error Handling
+## API (high level)
 
-The API employs a robust error handling strategy to ensure consistent and informative responses, and to prevent sensitive error details from leaking to the client in production.
+Base path: `/api`
 
-- **Async Error Handling**: Controller functions that involve asynchronous operations (e.g., database queries, external API calls) use `try...catch` blocks or rely on a global async error wrapper (if implemented, e.g., `express-async-errors`) to catch promise rejections and pass them to the centralized error handler.
-- **Validation Errors**: Input validation is performed by `express-validator` middleware. If validation fails, it typically sends a `400 Bad Request` response with an array of error messages detailing the specific validation failures.
-- **404 Not Found**: A dedicated middleware is used to handle requests to undefined routes. If no route matches the request, this middleware responds with a `404 Not Found` error.
-- **Centralized Error Handler**: All errors caught by route handlers or other middleware are passed to a final, centralized error handling middleware function (typically defined last in the Express middleware stack).
-  - This handler is responsible for:
-    - Logging the error (especially in development/staging environments) for debugging purposes.
-    - Determining the appropriate HTTP status code. If the error is a known type (e.g., a Mongoose validation error, a custom application error with a status code), that status is used. Otherwise, it defaults to `500 Internal Server Error`.
-    - Sending a structured JSON response to the client. In development, this response might include the error stack trace. In production, it will provide a generic error message to avoid exposing internal details.
-    - Example error response structure:
-      ```json
-      {
-        "message": "Descriptive error message",
-        // "error": "Detailed error object or stack trace" (in development only)
-      }
-      ```
+- Auth: `POST /auth/register`, `POST /auth/login`, `POST /auth/verify-2fa`, `POST /auth/change-password`
+- Music: `GET /music/search`, `GET /music/track/:id`, `GET /music/popular`
+- Users / Playlists / Favorites endpoints under `/users`
+- Songs: upload/stream endpoints under `/songs`
 
----
+For full details of each route and payloads, inspect the `routes/` and `controllers/` files.
+
+## Important operational notes
+
+- Redis is used for caching and 2FA sessions; if Redis becomes unavailable the app falls back to a no-op cache for non-critical features, but authentication will fail if 2FA storage is unavailable.
+- Keep `JWT_SECRET` strong and rotate it periodically if feasible.
+- Do not commit `.env` to source control. Use a secrets manager for production deployments.
+
+## Troubleshooting
+
+- If the server exits on startup, check env var validation output for the missing variable.
+- If email 2FA messages are not arriving, validate SMTP settings and check `emailService.js` logs.
+- For Redis issues, verify `REDIS_URL` connectivity and that the Redis server supports EVAL commands (standard Redis does).

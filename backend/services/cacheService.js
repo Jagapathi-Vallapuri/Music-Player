@@ -65,4 +65,16 @@ module.exports = {
       console.error('Redis del error', err);
     }
   }
+  ,
+  // Eval a Lua script with keys and args (helper for atomic operations)
+  async eval(script, keys = [], args = []) {
+    if (!redisConnected) return null;
+    try {
+      // client.eval(script, { keys, arguments: args }) works with node-redis v4
+      return await client.eval(script, { keys, arguments: args });
+    } catch (err) {
+      console.error('Redis eval error', err);
+      return null;
+    }
+  }
 };

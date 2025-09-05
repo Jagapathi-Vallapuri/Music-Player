@@ -30,9 +30,11 @@ export const login = async (email, password) => {
     }
 }
 
-export const verify2FA = async (email, code, type = 'login') => {
+export const verify2FA = async (email, code, type = 'login', sessionId = undefined) => {
     try {
-        const response = await api.post('/auth/verify-2fa', { email, code, type });
+        const body = { email, code, type };
+        if (sessionId) body.sessionId = sessionId;
+        const response = await api.post('/auth/verify-2fa', body);
         return response.data;
     } catch (err) {
         throw new Error(err.response?.data?.message || '2FA verification failed');

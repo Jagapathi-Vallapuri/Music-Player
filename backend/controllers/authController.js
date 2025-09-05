@@ -43,6 +43,8 @@ const register = async (req, res) => {
     }
 };
 
+const { randomUUID } = require('crypto');
+
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -63,13 +65,15 @@ const login = async (req, res) => {
             });
         }
 
+        // Create a session-scoped 2FA identifier so client can survive refresh
+        const sessionId = randomUUID();
         const code = Math.floor(100000 + Math.random() * 900000).toString();
-        await cache.set(`2fa:${user._id}`, code, 300);
+        await cache.set(`2fa:session:${sessionId}`, code, 300);
         await send2FACode(user.email, code);
         return res.status(200).json({
             success: true,
             message: '2FA code sent to your email. Please verify to complete login.',
-            data: { user: { id: user._id, username: user.username, email: user.email }, twoFactorRequired: true }
+            data: { sessionId, twoFactorRequired: true }
         });
     } catch (err) {
         console.error('Login error:', err);
@@ -83,19 +87,22 @@ const login = async (req, res) => {
 
 const verify2FAUnified = async (req, res) => {
     try {
-        const { email, code, type } = req.body;
+        const { email, code, type, sessionId } = req.body;
         if (!type || !['login', 'password-change'].includes(type)) {
             return res.status(400).json({ success: false, message: 'Invalid or missing type. Must be "login" or "password-change"' });
         }
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ success: false, message: 'User not found' });
-        }
-        if (!(await verify2FACode(user._id, code))) {
-            return res.status(401).json({ success: false, message: 'Invalid or expired 2FA code' });
-        }
-        
         if (type === 'login') {
+            if (!sessionId) return res.status(400).json({ success: false, message: 'Missing sessionId for login verification' });
+
+            const lua = `local v = redis.call('GET', KEYS[1]) if not v then return 0 end if v == ARGV[1] then redis.call('DEL', KEYS[1]) return 1 end return 0`;
+            const key = `2fa:session:${sessionId}`;
+            const ok = await cache.eval(lua, [key], [code]);
+            if (!ok) return res.status(401).json({ success: false, message: 'Invalid or expired 2FA code' });
+
+            // If verification succeeds, locate user by email to issue token
+            const user = await User.findOne({ email });
+            if (!user) return res.status(400).json({ success: false, message: 'User not found' });
+
             const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '2h' });
             return res.json({
                 success: true,
@@ -106,6 +113,13 @@ const verify2FAUnified = async (req, res) => {
                 }
             });
         } else if (type === 'password-change') {
+            const user = await User.findOne({ email });
+            if (!user) return res.status(400).json({ success: false, message: 'User not found' });
+
+            if (!(await verify2FACode(user._id, code))) {
+                return res.status(401).json({ success: false, message: 'Invalid or expired 2FA code' });
+            }
+
             const pendingPassword = await cache.get(`pendingPassword:${user._id}`);
             if (pendingPassword) {
                 user.password = pendingPassword;
