@@ -161,6 +161,22 @@ const getAvatar = async (req, res) => {
     }
 };
 
+// Delete current avatar
+const deleteAvatar = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('avatarFilename');
+        if (!user || !user.avatarFilename) return res.status(404).json({ message: 'Avatar not set' });
+        const filePath = path.join(avatarsDir, user.avatarFilename);
+        if (fs.existsSync(filePath)) {
+            fs.unlink(filePath, () => {}); // ignore unlink errors
+        }
+        await updateUserAndClearCache(req.user._id, { $unset: { avatarFilename: '' } });
+        res.json({ message: 'Avatar removed' });
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to delete avatar', error: err.message });
+    }
+};
+
 // Update about text
 const updateAbout = async (req, res) => {
     try {
@@ -197,6 +213,7 @@ module.exports = {
     updatePlaylist,
     uploadAvatar,
     getAvatar,
+    deleteAvatar,
     updateAbout,
     getMe,
     upload // export upload middleware for route wiring

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { addTrackToHistory, getUserHistory, getFavorites, addToFavorites, removeFromFavorites, createPlaylist, getUserPlaylists, deletePlaylist, updatePlaylist, uploadAvatar, getAvatar, updateAbout, getMe, upload } = require('../controllers/userController');
+const { addTrackToHistory, getUserHistory, getFavorites, addToFavorites, removeFromFavorites, createPlaylist, getUserPlaylists, deletePlaylist, updatePlaylist, uploadAvatar, getAvatar, deleteAvatar, updateAbout, getMe, upload } = require('../controllers/userController');
 const verifyToken = require('../middleware/authMiddleware');
 const { validateHistoryTrack, validateTrackId, validatePlaylist, validatePlaylistUpdate, validatePlaylistId } = require('../middleware/validationMiddleware');
 
@@ -19,5 +19,6 @@ router.get('/me', verifyToken, getMe);
 router.patch('/me', verifyToken, updateAbout);
 router.post('/me/avatar', verifyToken, upload.single('avatar'), uploadAvatar);
 router.get('/me/avatar', verifyToken, getAvatar);
+router.delete('/me/avatar', verifyToken, deleteAvatar);
 
 module.exports = router;

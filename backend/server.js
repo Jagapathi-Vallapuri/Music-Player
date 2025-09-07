@@ -22,7 +22,7 @@ app.use(express.json({ limit: '10mb' }));
 
 const corsOptions = {
   origin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 };
