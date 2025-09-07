@@ -8,6 +8,44 @@ const api = axios.create({
     }
 });
 
+let onUnauthorizedLogout = null;
+
+export const injectLogoutHandler = (logoutFn) => {
+    onUnauthorizedLogout = typeof logoutFn === 'function' ? logoutFn : null;
+};
+
+api.interceptors.request.use(
+    (config) => {
+        try {
+            const token = localStorage.getItem('token');
+            if (token && !config.headers.Authorization) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+        } catch (e) {
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+let isHandlingUnauthorized = false;
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error?.response?.status === 401) {
+            if (!isHandlingUnauthorized) {
+                isHandlingUnauthorized = true;
+                try {
+                    if (onUnauthorizedLogout) onUnauthorizedLogout();
+                } finally {
+                    setTimeout(() => { isHandlingUnauthorized = false; }, 500);
+                }
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 
 export const register = async (username, email, password) => {
     try {

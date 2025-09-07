@@ -1,133 +1,6 @@
-# MusicPlayer Backend
+# Pulse — Backend
 
-This repository contains the backend RESTful API for the MusicPlayer application. It provides user authentication, track search, favorites management, playlists, listening history, and caching features.
-
-## Table of Contents
-
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Environment Variables](#environment-variables)
-- [Running the Server](#running-the-server)
-- [Folder Structure](#folder-structure)
-- [API Endpoints](#api-endpoints)
-- [Caching Strategy](#caching-strategy)
-- [Rate Limiting](#rate-limiting)
-- [Error Handling](#error-handling)
-
-## Features
-
-- **User Authentication** (Register, Login) using JWT
-- **Mandatory 2FA**: All users must verify via email code for login and password changes
-- **Password Change**: Secure password updates with 2FA verification
-- **Profile Pictures**: Upload and retrieve user profile pictures (stored in MongoDB)
-- **Song Uploads**: Users can upload their own audio files (stored in MongoDB GridFS)
-- **Music Search** and **Track Details** via Jamendo API
-- **Popular Tracks** listing
-- **Favorites**: add/remove tracks
-- **Playlists**: create, update, delete, fetch user playlists
-- **Listening History**: record and retrieve track history
-- **Input Validation** with express-validator
-- **Rate Limiting** for general requests and sensitive routes
-- **Caching**: Redis-based caching for Jamendo API responses and user objects to improve performance and reduce database load.
-
-## Tech Stack
-
-- Node.js
-- Express.js
-- MongoDB (Mongoose + GridFS for file storage)
-- Redis (for caching)
-- JSON Web Tokens (jsonwebtoken)
-- Jamendo API (via axios)
-- Nodemailer (for email/2FA)
-- Multer & Multer-GridFS-Storage (for file uploads)
-- Middleware: CORS, Rate Limiting, Validation, Error Handling
-
-## Prerequisites
-
-- Node.js (v14+)
-- MongoDB instance (local or cloud)
-- Redis instance (local or cloud)
-- [ ] A `.env` file with the necessary variables
-
-## Installation
-
-1. Clone the repository:
-   ```bash
-   git clone <repo-url> backend
-   cd backend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-## Environment Variables
-
-Create a `.env` file in the `backend` folder with the following (examples):
-
-```dotenv
-# Required (server will exit if missing):
-MONGO_URL=<your-mongodb-connection-string>
-JWT_SECRET=<your-jwt-secret>
-
-# Redis (preferred: single URL). If not provided, you can use the individual components below.
-# REDIS_URL supports redis:// and rediss:// (TLS) formats.
-# Example: REDIS_URL=rediss://:mypassword@my-redis-host.example.com:6380
-REDIS_URL=redis://localhost:6379
-
-# Optional alternative (component) configuration:
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_USERNAME=default
-REDIS_PASSWORD=<your-redis-password>
-
-# Other optional vars:
-PORT=5000
-# JAMENDO_CLIENT_ID is required if you use Jamendo features
-# JAMENDO_CLIENT_ID=<your-jamendo-client-id>
-
-# SMTP settings for 2FA emails
-SMTP_HOST=<your-smtp-host>
-SMTP_PORT=465
-SMTP_SECURE=true
-SMTP_USER=<your-smtp-username>
-SMTP_PASS=<your-smtp-password>
-SMTP_FROM=<your-smtp-from-email>
-```
-
-Notes:
-- The server now validates required environment variables at startup and will exit early with a clear error if `MONGO_URL` or `JWT_SECRET` are missing.
-- Use `REDIS_URL` for cloud providers (recommended). If `REDIS_URL` is not set, the app will attempt to use `REDIS_HOST`/`REDIS_PORT`/`REDIS_USERNAME`/`REDIS_PASSWORD` if provided.
-- For cloud Redis, prefer TLS (`rediss://`) and restrict access via VPC/ACLs where possible.
-- In development you may keep a local Redis instance, but never commit credentials to source control — use a `.env` file and add it to `.gitignore` or use a secrets manager in production.
-- If Redis is unreachable, the application falls back to a safe no-op cache (writes are skipped and reads return null) so the server remains available.
-
-## Running the Server
-
-- Development (auto-restart on changes):
-  ```bash
-  npm run dev
-  ```
-- Production:
-  ```bash
-  npm start
-  ```
-
-The server will start on `http://localhost:<PORT>` and expose routes under `/api`.
-
-## Folder Structure
-
-```
-backend/
-├─ controllers/       # Route handlers
-│  ├─ authController.js
-│  ├─ musicController.js
-│  ├─ userController.js
-# MusicPlayer — Backend
-
-This folder contains the backend REST API for the MusicPlayer app (Express + MongoDB + Redis). This README is a concise developer guide to get the backend running locally, explains the 2FA session flow, and includes operational and security notes.
+This folder contains the backend REST API for the Pulse application (Express + MongoDB + Redis). This README is a concise developer guide to get the backend running locally, explains the 2FA session flow, and includes operational and security notes.
 
 ## Quick start
 
@@ -158,7 +31,7 @@ SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=you@example.com
 SMTP_PASS=secret
-SMTP_FROM="MusicPlayer <no-reply@example.com>"
+SMTP_FROM="Pulse <no-reply@example.com>"
 ```
 
 Notes:
@@ -178,26 +51,35 @@ A `Dockerfile` exists in this folder. To build and run locally:
 
 ```powershell
 cd backend
-docker build -t musicplayer-backend:local .
-docker run -p 5000:5000 --env-file .env musicplayer-backend:local
+docker build -t pulse-backend:local .
+docker run -p 5000:5000 --env-file .env pulse-backend:local
 ```
 
 When deploying to a container platform, ensure your environment variables (esp. `MONGO_URL`, `REDIS_URL`, and `JWT_SECRET`) are set securely in the target environment.
 
-## 2FA session behavior (important)
+## 2FA model (registration + password change)
 
-This backend uses server-issued 2FA sessions for login:
+Current design enforces email-based 2FA only for:
 
-- `POST /api/auth/login` authenticates credentials and, if valid, generates a short-lived server `sessionId` (UUID) and an email 6-digit code.
-- The code is stored in Redis at key `2fa:session:{sessionId}` with a TTL (short, e.g., 300s). The `sessionId` is returned to the client.
-- The client submits the code along with `sessionId` to `POST /api/auth/verify-2fa`.
-- Verification uses a Redis Lua script that atomically compares the stored code with the supplied one and deletes the key on success. This prevents race conditions and one-time reuse.
+1. Initial registration (account activation)
+2. Password changes (confirmation)
 
-Frontend behavior: clients should persist `sessionId` (e.g., `sessionStorage`) while awaiting the code so a page reload doesn’t break the flow.
+Login itself is now a single step (JWT issued immediately) but only after the user has verified their email via the registration 2FA. A new field `isVerified` on the `User` model gates access:
 
-Security notes about 2FA:
-- Codes are short-lived, but currently stored server-side in Redis. For better security, consider storing a keyed HMAC of the code instead of plaintext.
-- Add a per-session attempt counter or rate-limiting to mitigate brute-force attempts.
+- `POST /api/auth/register` creates the user with `isVerified=false`, generates a `sessionId` + 6‑digit code, stores it in Redis at key `2fa:session:{sessionId}` with JSON payload `{ code, email, purpose: 'register' }` (TTL ~300s) and emails the code.
+- Client calls `POST /api/auth/verify-2fa` with `{ email, code, type: 'register', sessionId }` to activate. On success: `isVerified` is set true and a JWT is returned.
+- `POST /api/auth/login` returns 403 if `isVerified=false`.
+- `POST /api/auth/change-password` sends a one-time 2FA code (stored at `2fa:{userId}`) and puts the hashed pending password at `pendingPassword:{userId}` until verified via `POST /api/auth/verify-2fa` with `type: 'password-change'`.
+
+Security notes / future hardening:
+- Consider hashing/HMAC’ing codes before storage (defense-in-depth if Redis compromised).
+- Track attempt counts per session (`attempts:2fa:session:{sessionId}`) to lock after N failures.
+- Consider adding optional time-based authenticator app support later (fallback to email only).
+- Ensure SMTP rate limiting at provider level to deter abuse.
+
+Client guidance:
+- Persist `sessionId` (e.g., `sessionStorage`) during registration verification so refreshes don’t orphan the flow.
+- On 403 login response with message `Account not verified`, redirect user to a resend/verification UX.
 
 ## Folder overview
 

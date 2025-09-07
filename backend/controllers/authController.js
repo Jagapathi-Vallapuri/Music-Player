@@ -9,37 +9,32 @@ const register = async (req, res) => {
         const { username, email, password } = req.body;
 
         const existingUser = await User.findOne({ email });
-
         if (existingUser) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'User already exists' 
-            });
+            return res.status(400).json({ success: false, message: 'User already exists' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-
-        const newUser = new User({ username, email, password: hashedPassword });
-
+        const newUser = new User({ username, email, password: hashedPassword, isVerified: false });
         await newUser.save();
 
-        res.status(201).json({ 
-            success: true, 
-            message: 'User created successfully',
+        // Initiate 2FA for registration (no token yet)
+        const sessionId = randomUUID();
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        await cache.set(`2fa:session:${sessionId}`, JSON.stringify({ code, email, purpose: 'register' }), 300);
+        await send2FACode(newUser.email, code);
+
+        return res.status(201).json({
+            success: true,
+            message: 'Registration initiated. 2FA code sent to email. Verify to activate account.',
             data: {
-                id: newUser._id,
-                username: newUser.username,
-                email: newUser.email
+                sessionId,
+                twoFactorRequired: true,
+                type: 'register'
             }
         });
-    }
-    catch (err) {
+    } catch (err) {
         console.error('Registration error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error registering user', 
-            error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-        });
+        return res.status(500).json({ success: false, message: 'Error registering user', error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error' });
     }
 };
 
@@ -48,70 +43,65 @@ const { randomUUID } = require('crypto');
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
-
         const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'User not found' 
-            });
-        }
-
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Invalid credentials' 
-            });
-        }
-
-        // Create a session-scoped 2FA identifier so client can survive refresh
-        const sessionId = randomUUID();
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        await cache.set(`2fa:session:${sessionId}`, code, 300);
-        await send2FACode(user.email, code);
-        return res.status(200).json({
-            success: true,
-            message: '2FA code sent to your email. Please verify to complete login.',
-            data: { sessionId, twoFactorRequired: true }
-        });
+        if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        if (!user.isVerified) return res.status(403).json({ success: false, message: 'Account not verified. Please complete email 2FA from registration.' });
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30m' });
+        return res.json({ success: true, message: 'Login successful', data: { token, user: { id: user._id, username: user.username, email: user.email } } });
     } catch (err) {
         console.error('Login error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Login failed', 
-            error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-        });
+        return res.status(500).json({ success: false, message: 'Login failed', error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error' });
     }
 };
 
 const verify2FAUnified = async (req, res) => {
     try {
         const { email, code, type, sessionId } = req.body;
-        if (!type || !['login', 'password-change'].includes(type)) {
-            return res.status(400).json({ success: false, message: 'Invalid or missing type. Must be "login" or "password-change"' });
+        if (!type || !['login', 'password-change', 'register'].includes(type)) {
+            return res.status(400).json({ success: false, message: 'Invalid or missing type. Must be "login", "register" or "password-change"' });
         }
         if (type === 'login') {
             if (!sessionId) return res.status(400).json({ success: false, message: 'Missing sessionId for login verification' });
 
-            const lua = `local v = redis.call('GET', KEYS[1]) if not v then return 0 end if v == ARGV[1] then redis.call('DEL', KEYS[1]) return 1 end return 0`;
             const key = `2fa:session:${sessionId}`;
-            const ok = await cache.eval(lua, [key], [code]);
-            if (!ok) return res.status(401).json({ success: false, message: 'Invalid or expired 2FA code' });
+            const raw = await cache.get(key);
+            if (!raw) return res.status(401).json({ success: false, message: 'Invalid or expired 2FA code' });
+            let parsed;
+            try { parsed = JSON.parse(raw); } catch { parsed = { code: raw }; }
+            if (parsed.code !== code || parsed.purpose !== 'login') {
+                return res.status(401).json({ success: false, message: 'Invalid or expired 2FA code' });
+            }
+            await cache.del(key);
 
-            // If verification succeeds, locate user by email to issue token
+            const user = await User.findOne({ email });
+            if (!user) return res.status(400).json({ success: false, message: 'User not found' });
+            if (!user.isVerified) return res.status(403).json({ success: false, message: 'Account not verified' });
+
+            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30m' });
+            return res.json({ success: true, message: '2FA verification successful', data: { token, user: { id: user._id, username: user.username, email: user.email } } });
+        } else if (type === 'register') {
+            if (!sessionId) return res.status(400).json({ success: false, message: 'Missing sessionId for registration verification' });
+            const key = `2fa:session:${sessionId}`;
+            const raw = await cache.get(key);
+            if (!raw) return res.status(401).json({ success: false, message: 'Invalid or expired 2FA code' });
+            let parsed;
+            try { parsed = JSON.parse(raw); } catch { parsed = { code: raw }; }
+            if (parsed.code !== code || parsed.purpose !== 'register' || parsed.email !== email) {
+                return res.status(401).json({ success: false, message: 'Invalid or expired 2FA code' });
+            }
+            await cache.del(key);
+
             const user = await User.findOne({ email });
             if (!user) return res.status(400).json({ success: false, message: 'User not found' });
 
-            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '2h' });
-            return res.json({
-                success: true,
-                message: '2FA verification successful',
-                data: {
-                    token,
-                    user: { id: user._id, username: user.username, email: user.email }
-                }
-            });
+            if (!user.isVerified) {
+                user.isVerified = true;
+                await user.save();
+            }
+            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30m' });
+            return res.json({ success: true, message: 'Registration verification successful', data: { token, user: { id: user._id, username: user.username, email: user.email } } });
         } else if (type === 'password-change') {
             const user = await User.findOne({ email });
             if (!user) return res.status(400).json({ success: false, message: 'User not found' });
@@ -126,14 +116,11 @@ const verify2FAUnified = async (req, res) => {
                 await user.save();
                 await cache.del(`pendingPassword:${user._id}`);
             }
-            return res.json({
-                success: true,
-                message: 'Password change confirmed successfully'
-            });
+            return res.json({ success: true, message: 'Password change confirmed successfully' });
         }
     } catch (err) {
         console.error('Unified 2FA verification error:', err);
-        res.status(500).json({ success: false, message: '2FA verification failed', error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error' });
+        return res.status(500).json({ success: false, message: '2FA verification failed', error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error' });
     }
 };
 

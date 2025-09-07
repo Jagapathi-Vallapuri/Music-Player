@@ -9,5 +9,8 @@ router.post('/register', authLimiter, validateRegister, register);
 router.post('/login', authLimiter, validateLogin, login);
 router.post('/verify-2fa', authLimiter, verify2FAUnified);
 router.post('/change-password', authLimiter, verifyToken, changePassword);
+router.get('/validate', verifyToken, (req, res) => {
+	res.json({ valid: true, user: { id: req.user._id, username: req.user.username, email: req.user.email } });
+});
 
 module.exports = router;

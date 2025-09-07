@@ -1,10 +1,11 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 
-// Simple protected wrapper: checks for a token in localStorage and redirects to login if missing
+// Protected wrapper: consults AuthContext for authentication state
 const ProtectedRoute = ({ children }) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  if (!token) return <Navigate to="/" replace />;
+  const auth = useAuth();
+  if (!auth || !auth.isAuthenticated) return <Navigate to="/" replace />;
   return children;
 };
 
