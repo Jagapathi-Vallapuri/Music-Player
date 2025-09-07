@@ -79,4 +79,34 @@ export const verify2FA = async (email, code, type = 'login', sessionId = undefin
     }
 };
 
+// Profile helpers
+export const getMe = async () => {
+    try {
+        const res = await api.get('/users/me');
+        return res.data;
+    } catch (err) {
+        throw new Error(err.response?.data?.message || 'Failed to fetch profile');
+    }
+};
+
+export const updateAbout = async (about) => {
+    try {
+        const res = await api.patch('/users/me', { about });
+        return res.data;
+    } catch (err) {
+        throw new Error(err.response?.data?.message || 'Failed to update about');
+    }
+};
+
+export const uploadAvatar = async (file) => {
+    try {
+        const form = new FormData();
+        form.append('avatar', file);
+        const res = await api.post('/users/me/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+        return res.data;
+    } catch (err) {
+        throw new Error(err.response?.data?.message || 'Failed to upload avatar');
+    }
+};
+
 export default api;

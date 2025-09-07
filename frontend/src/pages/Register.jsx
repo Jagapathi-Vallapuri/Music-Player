@@ -21,6 +21,7 @@ import {
     Visibility,
     VisibilityOff
 } from '@mui/icons-material';
+import TwoFactorForm from '../components/auth/TwoFactorForm.jsx';
 
 const Register = () => {
     const [formData, setFormData] = useState({ username: '', email: '', password: '', confirmPassword: '' });
@@ -100,7 +101,6 @@ const Register = () => {
             const res = await verify2FA(email, code, 'register', sid);
             if (res?.success && res?.data?.token) {
                 setMsg('Account verified! Redirecting to login...');
-                // Do not auto-login here; user proceeds to login explicitly or we could optionally log them in.
                 setTimeout(() => navigate('/'), 1500);
             } else {
                 setMsg(res.message || 'Verification failed');
@@ -300,17 +300,14 @@ const Register = () => {
                     </Box>
                     )}
                     {mode === 'verify' && (
-                        <div style={{ width: '100%' }}>
-                            {/** Reuse existing TwoFactorForm */}
-                            {React.createElement(require('../components/auth/TwoFactorForm.jsx').default, {
-                                onVerify: handleVerify,
-                                onResend: handleResend,
-                                onBack: handleBack,
-                                loading,
-                                email: formData.email,
-                                resendCooldown
-                            })}
-                        </div>
+                        <TwoFactorForm
+                            onVerify={handleVerify}
+                            onResend={handleResend}
+                            onBack={handleBack}
+                            loading={loading}
+                            email={formData.email}
+                            resendCooldown={resendCooldown}
+                        />
                     )}
 
                     {mode === 'form' && (

@@ -15,6 +15,8 @@ const userSchema = new mongoose.Schema({
     ],
     profilePicture: { type: Buffer },
     profilePictureType: { type: String },
+    about: { type: String, maxlength: 500, default: '' },
+    avatarFilename: { type: String },
     uploadedSongs: [{
         filename: { type: String, required: true },
         originalName: { type: String, required: true },

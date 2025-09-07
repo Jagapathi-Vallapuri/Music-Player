@@ -2,9 +2,31 @@ const User = require('../models/User');
 const Playlist = require('../models/Playlist');
 const cache = require('../services/cacheService');
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
+// Ensure avatars directory exists
+const avatarsDir = path.join(__dirname, '..', 'uploads', 'avatars');
+if (!fs.existsSync(avatarsDir)) {
+    fs.mkdirSync(avatarsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, avatarsDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname) || '.png';
+        cb(null, `${req.user._id}-${Date.now()}${ext}`);
+    }
+});
+
+const imageFileFilter = (req, file, cb) => {
+    if (!/^(image)\//.test(file.mimetype)) {
+        return cb(new Error('Only image uploads are allowed'));
+    }
+    cb(null, true);
+};
+
+const upload = multer({ storage, limits: { fileSize: 2 * 1024 * 1024 }, fileFilter: imageFileFilter }); // 2MB limit
 
 const updateUserAndClearCache = async (userId, update) => {
     await User.findByIdAndUpdate(userId, update);
@@ -109,27 +131,57 @@ const updatePlaylist = async (req, res) => {
     }
 };
 
-// Upload profile picture
-const uploadProfilePicture = async (req, res) => {
+// Upload avatar (stores on disk, saves filename)
+const uploadAvatar = async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-        const profilePictureBuffer = req.file.buffer;
-        const profilePictureType = req.file.mimetype;
-        await updateUserAndClearCache(req.user._id, { profilePicture: profilePictureBuffer, profilePictureType });
-        res.json({ message: 'Profile picture uploaded successfully' });
+        const oldUser = await User.findById(req.user._id).select('avatarFilename');
+        // Delete old avatar file if exists
+        if (oldUser?.avatarFilename) {
+            const oldPath = path.join(avatarsDir, oldUser.avatarFilename);
+            fs.unlink(oldPath, () => {}); // ignore errors
+        }
+        await updateUserAndClearCache(req.user._id, { avatarFilename: req.file.filename });
+        res.json({ message: 'Avatar uploaded', filename: req.file.filename });
     } catch (err) {
-        res.status(500).json({ message: 'Failed to upload profile picture', error: err.message });
+        res.status(500).json({ message: 'Failed to upload avatar', error: err.message });
     }
 };
 
-const getProfilePicture = async (req, res) => {
+// Serve current avatar file
+const getAvatar = async (req, res) => {
     try {
-        const user = await User.findById(req.user._id).select('profilePicture profilePictureType');
-        if (!user || !user.profilePicture) return res.status(404).json({ message: 'Profile picture not found' });
-        res.set('Content-Type', user.profilePictureType);
-        res.send(user.profilePicture);
+        const user = await User.findById(req.user._id).select('avatarFilename');
+        if (!user || !user.avatarFilename) return res.status(404).json({ message: 'Avatar not set' });
+        const filePath = path.join(avatarsDir, user.avatarFilename);
+        if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'Avatar file missing' });
+        return res.sendFile(filePath);
     } catch (err) {
-        res.status(500).json({ message: 'Failed to get profile picture', error: err.message });
+        res.status(500).json({ message: 'Failed to get avatar', error: err.message });
+    }
+};
+
+// Update about text
+const updateAbout = async (req, res) => {
+    try {
+        const { about } = req.body;
+        if (typeof about !== 'string' || about.length > 500) {
+            return res.status(400).json({ message: 'About must be a string up to 500 characters' });
+        }
+        await updateUserAndClearCache(req.user._id, { about });
+        res.json({ message: 'About updated', about });
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to update about', error: err.message });
+    }
+};
+
+// Get self profile (minimal)
+const getMe = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('username email about avatarFilename');
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to get profile', error: err.message });
     }
 };
 
@@ -143,6 +195,9 @@ module.exports = {
     getUserPlaylists,
     deletePlaylist,
     updatePlaylist,
-    uploadProfilePicture,
-    getProfilePicture
+    uploadAvatar,
+    getAvatar,
+    updateAbout,
+    getMe,
+    upload // export upload middleware for route wiring
 };
