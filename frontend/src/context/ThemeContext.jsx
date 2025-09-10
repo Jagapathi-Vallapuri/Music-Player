@@ -106,7 +106,32 @@ const createCustomTheme = (mode) => {
             '&:hover fieldset': { borderColor: isLight ? alpha('#0f1419', 0.34) : alpha('#ffffff', 0.34) },
             '&.Mui-focused fieldset': { borderColor: primary.main }
           },
-          input: { padding: '14px 14px' }
+          input: {
+            padding: '14px 14px',
+            // Neutralize Chrome/Safari autofill yellow background
+            '&:-webkit-autofill': {
+              WebkitBoxShadow: '0 0 0 1000px transparent inset',
+              WebkitTextFillColor: 'inherit',
+              transition: 'background-color 9999s ease-out'
+            },
+            '&:-webkit-autofill:hover': {
+              WebkitBoxShadow: '0 0 0 1000px transparent inset'
+            },
+            '&:-webkit-autofill:focus': {
+              WebkitBoxShadow: '0 0 0 1000px transparent inset'
+            }
+          }
+        }
+      },
+      MuiInputLabel: {
+        styleOverrides: {
+          root: {
+            // Keep label style consistent whether filled (autofill) or not
+            '&.MuiFormLabel-filled': {
+              color: 'inherit',
+              fontWeight: 500
+            }
+          }
         }
       },
       MuiAppBar: {

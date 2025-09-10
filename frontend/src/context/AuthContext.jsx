@@ -66,11 +66,20 @@ export const AuthProvider = ({ children }) => {
     if (navigateAway) navigate('/');
   };
 
+  const updateUser = (partial) => {
+    setUser(prev => {
+      const updated = { ...(prev || {}), ...(typeof partial === 'function' ? partial(prev) : partial) };
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch (_) {}
+      return updated;
+    });
+  };
+
   const value = {
     token,
     user,
     login,
     logout,
+  updateUser,
     isAuthenticated: !!token,
     authLoading,
   };

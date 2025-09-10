@@ -1,11 +1,24 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { Box, CircularProgress } from '@mui/material';
 
-// Protected wrapper: consults AuthContext for authentication state
+// Protected wrapper that waits for auth bootstrap before deciding redirect
 const ProtectedRoute = ({ children }) => {
-  const auth = useAuth();
-  if (!auth || !auth.isAuthenticated) return <Navigate to="/" replace />;
+  const { isAuthenticated, authLoading } = useAuth();
+
+  if (authLoading) {
+    return (
+      <Box sx={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
   return children;
 };
 

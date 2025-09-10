@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Box from '@mui/material/Box';
@@ -16,6 +16,39 @@ import { Link as RouterLink } from 'react-router-dom';
 const Header = ({ title = 'Pulse' }) => {
   const auth = useAuth();
   const { themeMode, toggleTheme } = useTheme();
+
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  useEffect(() => {
+    let active = true;
+    const fetchAvatar = async () => {
+      if (auth?.isAuthenticated && auth.user?.avatarFilename) {
+        try {
+          const baseApi = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${baseApi}/users/me/avatar?cacheBust=${auth.user.avatarFilename}`, {
+            headers: { Authorization: token ? `Bearer ${token}` : undefined }
+          });
+          if (res.ok) {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            if (active) {
+              setAvatarUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+            } else {
+              URL.revokeObjectURL(url);
+            }
+          } else {
+            setAvatarUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+          }
+        } catch (_) {
+          setAvatarUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+        }
+      } else {
+        setAvatarUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+      }
+    };
+    fetchAvatar();
+    return () => { active = false; setAvatarUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; }); };
+  }, [auth?.user?.avatarFilename, auth?.isAuthenticated]);
 
   return (
     <AppBar position="static" color="primary">
@@ -44,7 +77,7 @@ const Header = ({ title = 'Pulse' }) => {
               }}>
                 <Avatar
                   alt={auth.user?.username}
-                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(auth.user?.username || 'User')}`}
+                  src={avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(auth.user?.username || 'User')}`}
                   sx={{ width: 36, height: 36, mr: 1, border: (theme) => `2px solid ${theme.palette.primary.light}` }}
                 />
                 <Typography component="span" className="username" sx={{ fontWeight: 500 }}>

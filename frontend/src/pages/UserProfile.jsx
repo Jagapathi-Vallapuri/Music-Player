@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Avatar, Box, Container, Grid, Paper, Stack, Typography, Divider, Button, TextField, CircularProgress, IconButton, Tooltip } from '@mui/material';
-import { getMe, updateAbout, uploadAvatar } from '../../client.js';
+import { Avatar, Box, Container, Paper, Stack, Typography, Divider, Button, TextField, CircularProgress, IconButton, Tooltip } from '@mui/material';
+import { getMe, updateAbout, uploadAvatar, deleteAvatar } from '../../client.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { PhotoCamera, Edit, Save, Cancel } from '@mui/icons-material';
 
 const placeholderAbout = `Music enthusiast. Curator of eclectic playlists. Exploring independent artists and immersive soundscapes.`;
@@ -15,6 +16,7 @@ const metrics = [
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { updateUser } = useAuth();
   const [aboutEdit, setAboutEdit] = useState(false);
   const [aboutValue, setAboutValue] = useState('');
   const [aboutSaving, setAboutSaving] = useState(false);
@@ -47,6 +49,7 @@ const UserProfile = () => {
     try {
       const res = await updateAbout(aboutValue);
       setProfile(p => ({ ...p, about: res.about }));
+  updateUser({ about: res.about });
       setAboutEdit(false);
       setSuccessMsg('About updated');
     } catch (err) {
@@ -63,13 +66,59 @@ const UserProfile = () => {
     try {
       const res = await uploadAvatar(file);
       setProfile(p => ({ ...p, avatarFilename: res.filename }));
+      updateUser({ avatarFilename: res.filename });
       setSuccessMsg('Avatar updated');
     } catch (err) {
       setError(err.message);
     } finally { setAvatarUploading(false); }
   };
 
-  const avatarUrl = profile?.avatarFilename ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/users/me/avatar?cacheBust=${profile.avatarFilename}` : undefined;
+  const handleAvatarDelete = async () => {
+    if (!profile?.avatarFilename) return;
+    if (!window.confirm('Remove your avatar?')) return;
+    setAvatarUploading(true); setError(null); setSuccessMsg(null);
+    try {
+      await deleteAvatar();
+      setProfile(p => ({ ...p, avatarFilename: undefined }));
+      updateUser({ avatarFilename: undefined });
+      setSuccessMsg('Avatar removed');
+    } catch (err) {
+      setError(err.message);
+    } finally { setAvatarUploading(false); }
+  };
+
+  const [avatarBlobUrl, setAvatarBlobUrl] = useState(null);
+  useEffect(() => {
+    let revokeTimer;
+    const fetchAvatar = async () => {
+      if (profile?.avatarFilename) {
+        try {
+          const baseApi = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${baseApi}/users/me/avatar?cacheBust=${profile.avatarFilename}`, {
+              headers: { Authorization: token ? `Bearer ${token}` : undefined }
+            });
+            if (res.ok) {
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              setAvatarBlobUrl(prev => {
+                if (prev) URL.revokeObjectURL(prev);
+                return url;
+              });
+            }
+        } catch (_) {
+          // ignore
+        }
+      } else {
+        setAvatarBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+      }
+    };
+    fetchAvatar();
+    return () => {
+      if (revokeTimer) clearTimeout(revokeTimer);
+      setAvatarBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+    };
+  }, [profile?.avatarFilename]);
 
   return (
     <Container maxWidth="lg" sx={{ pt: 6, pb: 10 }}>
@@ -77,7 +126,7 @@ const UserProfile = () => {
         <Paper elevation={0} sx={(theme) => ({ p: 4, display: 'flex', gap: 3, alignItems: 'center', background: theme.palette.gradients.surface, position: 'relative' })}>
           <Box sx={{ position: 'relative' }}>
             <Avatar
-              src={avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${profile?.username || 'User'}`}
+              src={avatarBlobUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${profile?.username || 'User'}`}
               alt="User avatar"
               sx={{ width: 112, height: 112, border: (theme) => `3px solid ${theme.palette.primary.main}` }}
             />
@@ -87,6 +136,13 @@ const UserProfile = () => {
                 {avatarUploading ? <CircularProgress size={18} color="inherit" /> : <PhotoCamera fontSize="small" />}
               </IconButton>
             </Tooltip>
+            {profile?.avatarFilename && (
+              <Tooltip title="Remove avatar">
+                <IconButton size="small" onClick={handleAvatarDelete} sx={{ position: 'absolute', top: 4, right: 4, background: 'rgba(255,0,0,0.5)', color: '#fff', '&:hover': { background: 'rgba(255,0,0,0.7)' } }}>
+                  {avatarUploading ? <CircularProgress size={16} color="inherit" /> : '×'}
+                </IconButton>
+              </Tooltip>
+            )}
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="h4" sx={{ fontWeight: 600 }}>{profile?.username || 'Loading...'}</Typography>
@@ -120,16 +176,14 @@ const UserProfile = () => {
           </Box>
         </Paper>
 
-        <Grid container spacing={3}>
+        <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' } }}>
           {metrics.map(m => (
-            <Grid item xs={12} sm={6} md={3} key={m.label}>
-              <Paper elevation={0} sx={(theme) => ({ p: 3, textAlign: 'center', background: theme.palette.gradients.surface })}>
-                <Typography variant="h5" sx={{ fontWeight: 600 }}>{m.value}</Typography>
-                <Typography variant="body2" color="text.secondary">{m.label}</Typography>
-              </Paper>
-            </Grid>
+            <Paper key={m.label} elevation={0} sx={(theme) => ({ p: 3, textAlign: 'center', background: theme.palette.gradients.surface })}>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>{m.value}</Typography>
+              <Typography variant="body2" color="text.secondary">{m.label}</Typography>
+            </Paper>
           ))}
-        </Grid>
+        </Box>
 
   <Paper elevation={0} sx={(theme) => ({ p: 4, background: theme.palette.gradients.surface })}>
           <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>Recent Activity</Typography>

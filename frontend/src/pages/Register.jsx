@@ -145,7 +145,7 @@ const Register = () => {
             setSessionId(existingSid);
             setFormData(f => ({ ...f, email: existingEmail }));
             setMode('verify');
-            if (resendCooldown === 0) setResendCooldown(10); // short timer after refresh
+            if (resendCooldown === 0) setResendCooldown(10);
             startResendTimer();
         }
     }, []);

@@ -109,4 +109,13 @@ export const uploadAvatar = async (file) => {
     }
 };
 
+export const deleteAvatar = async () => {
+    try {
+        const res = await api.delete('/users/me/avatar');
+        return res.data;
+    } catch (err) {
+        throw new Error(err.response?.data?.message || 'Failed to delete avatar');
+    }
+};
+
 export default api;
