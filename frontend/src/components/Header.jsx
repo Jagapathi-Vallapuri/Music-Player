@@ -53,7 +53,7 @@ const Header = ({ title = 'Pulse' }) => {
   return (
     <AppBar position="static" color="primary">
       <Toolbar sx={{ justifyContent: 'space-between' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box component={RouterLink} to="/home" sx={{ display: 'flex', alignItems: 'center', color: 'inherit', textDecoration: 'none' }}>
           <IconButton edge="start" color="inherit" aria-label="logo" sx={{ mr: 1 }}>
             <MusicNoteIcon />
           </IconButton>

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import { login } from '../../client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Container, Paper, Typography, Alert, Link } from '@mui/material';
 import LoginForm from '../components/auth/LoginForm.jsx';
+import { useUI } from '../context/UIContext.jsx';
 
 
 const Login = () => {
@@ -13,6 +14,7 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const auth = useAuth();
+    const { toastError, toastSuccess } = useUI();
 
     const handleLogin = async ({ email: eEmail, password }) => {
         setMsg(null);
@@ -22,12 +24,17 @@ const Login = () => {
             const response = await login(eEmail, password);
             if (response && response.success && response.data && response.data.token) {
                 auth.login(response.data.token, response.data.user);
+                toastSuccess('Logged in successfully');
                 navigate('/home');
                 return;
             }
-            setMsg(response.message || 'Login failed');
+            const m = response?.message || 'Login failed';
+            setMsg(m);
+            toastError(m);
         } catch (error) {
-            setMsg(error.message || 'Login error');
+            const m = error?.message || 'Login error';
+            setMsg(m);
+            toastError(m);
         } finally {
             setLoading(false);
         }
@@ -80,7 +87,7 @@ const Login = () => {
 
                     <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
                         Don't have an account?{' '}
-                        <Link href="/register" variant="subtitle2" underline="hover" sx={{ fontWeight: 600 }}>
+                        <Link component={RouterLink} to="/register" variant="subtitle2" underline="hover" sx={{ fontWeight: 600 }}>
                             Create one
                         </Link>
                     </Typography>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { register } from "../../client.js";
 import {
     Container,
@@ -22,6 +22,7 @@ import {
     VisibilityOff
 } from '@mui/icons-material';
 import TwoFactorForm from '../components/auth/TwoFactorForm.jsx';
+import { useUI } from '../context/UIContext.jsx';
 
 const Register = () => {
     const [formData, setFormData] = useState({ username: '', email: '', password: '', confirmPassword: '' });
@@ -33,6 +34,7 @@ const Register = () => {
     const [sessionId, setSessionId] = useState(null);
     const [resendCooldown, setResendCooldown] = useState(0);
     const navigate = useNavigate();
+    const { toastError, toastSuccess, toastInfo } = useUI();
 
     const handleChange = (e) => {
         setFormData({
@@ -44,14 +46,17 @@ const Register = () => {
     const validateForm = () => {
         if (formData.password !== formData.confirmPassword) {
             setMsg('Passwords do not match');
+            toastError('Passwords do not match');
             return false;
         }
         if (formData.password.length < 6) {
             setMsg('Password must be at least 6 characters long');
+            toastError('Password must be at least 6 characters long');
             return false;
         }
         if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
             setMsg('Password must contain at least one lowercase letter, one uppercase letter, and one number');
+            toastError('Password must contain at least one lowercase letter, one uppercase letter, and one number');
             return false;
         }
         return true;
@@ -71,12 +76,17 @@ const Register = () => {
                 setMode('verify');
                 setResendCooldown(30);
                 setMsg('Verification code sent to your email');
+                toastInfo('Verification code sent to your email');
                 startResendTimer();
             } else {
-                setMsg(response.message || 'Registration failed');
+                const m = response?.message || 'Registration failed';
+                setMsg(m);
+                toastError(m);
             }
         } catch (error) {
-            setMsg(error.message || 'Registration error');
+            const m = error?.message || 'Registration error';
+            setMsg(m);
+            toastError(m);
         } finally {
             setLoading(false);
         }
@@ -101,12 +111,17 @@ const Register = () => {
             const res = await verify2FA(email, code, 'register', sid);
             if (res?.success && res?.data?.token) {
                 setMsg('Account verified! Redirecting to login...');
+                toastSuccess('Account verified');
                 setTimeout(() => navigate('/'), 1500);
             } else {
-                setMsg(res.message || 'Verification failed');
+                const m = res?.message || 'Verification failed';
+                setMsg(m);
+                toastError(m);
             }
         } catch (err) {
-            setMsg(err.message || 'Verification error');
+            const m = err?.message || 'Verification error';
+            setMsg(m);
+            toastError(m);
         } finally {
             setLoading(false);
         }
@@ -123,13 +138,18 @@ const Register = () => {
                 setSessionId(response.data.sessionId);
                 sessionStorage.setItem('registerSessionId', response.data.sessionId);
                 setMsg('Code resent');
+                toastInfo('Verification code resent');
                 setResendCooldown(30);
                 startResendTimer();
             } else {
-                setMsg(response.message || 'Resend failed');
+                const m = response?.message || 'Resend failed';
+                setMsg(m);
+                toastError(m);
             }
         } catch (err) {
-            setMsg(err.message || 'Resend failed');
+            const m = err?.message || 'Resend failed';
+            setMsg(m);
+            toastError(m);
         } finally { setLoading(false); }
     };
 
@@ -313,7 +333,7 @@ const Register = () => {
                     {mode === 'form' && (
                         <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
                             Already have an account?{' '}
-                            <Link href="/" variant="subtitle2" underline="hover" sx={{ fontWeight: 600 }}>
+                            <Link component={RouterLink} to="/" variant="subtitle2" underline="hover" sx={{ fontWeight: 600 }}>
                                 Sign in
                             </Link>
                         </Typography>

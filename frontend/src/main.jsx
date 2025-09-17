@@ -6,6 +6,7 @@ import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
+import { UIProvider } from './context/UIContext.jsx';
 
 const AppWrapper = () => {
   const { theme } = useTheme();
@@ -23,7 +24,9 @@ const AppWrapper = () => {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
-      <AppWrapper />
+      <UIProvider>
+        <AppWrapper />
+      </UIProvider>
     </ThemeProvider>
   </StrictMode>,
 )

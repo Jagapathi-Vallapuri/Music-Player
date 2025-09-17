@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Avatar, Box, Container, Paper, Stack, Typography, Divider, Button, TextField, CircularProgress, IconButton, Tooltip } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import { getMe, updateAbout, uploadAvatar, deleteAvatar } from '../../client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PhotoCamera, Edit, Save, Cancel } from '@mui/icons-material';
+import { useUI } from '../context/UIContext.jsx';
 
 const placeholderAbout = `Music enthusiast. Curator of eclectic playlists. Exploring independent artists and immersive soundscapes.`;
 
@@ -23,6 +25,7 @@ const UserProfile = () => {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+  const { toastSuccess, toastError } = useUI();
 
   useEffect(() => {
     let cancelled = false;
@@ -49,11 +52,14 @@ const UserProfile = () => {
     try {
       const res = await updateAbout(aboutValue);
       setProfile(p => ({ ...p, about: res.about }));
-  updateUser({ about: res.about });
+      updateUser({ about: res.about });
       setAboutEdit(false);
-      setSuccessMsg('About updated');
+      const m = 'About updated';
+      setSuccessMsg(m);
+      toastSuccess(m);
     } catch (err) {
       setError(err.message);
+      toastError(err.message);
     } finally { setAboutSaving(false); }
   };
 
@@ -67,9 +73,12 @@ const UserProfile = () => {
       const res = await uploadAvatar(file);
       setProfile(p => ({ ...p, avatarFilename: res.filename }));
       updateUser({ avatarFilename: res.filename });
-      setSuccessMsg('Avatar updated');
+      const m = 'Avatar updated';
+      setSuccessMsg(m);
+      toastSuccess(m);
     } catch (err) {
       setError(err.message);
+      toastError(err.message);
     } finally { setAvatarUploading(false); }
   };
 
@@ -81,9 +90,12 @@ const UserProfile = () => {
       await deleteAvatar();
       setProfile(p => ({ ...p, avatarFilename: undefined }));
       updateUser({ avatarFilename: undefined });
-      setSuccessMsg('Avatar removed');
+      const m = 'Avatar removed';
+      setSuccessMsg(m);
+      toastSuccess(m);
     } catch (err) {
       setError(err.message);
+      toastError(err.message);
     } finally { setAvatarUploading(false); }
   };
 
@@ -173,6 +185,9 @@ const UserProfile = () => {
             </Box>
             {error && <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>{error}</Typography>}
             {successMsg && <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 1 }}>{successMsg}</Typography>}
+            <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+              <Button component={RouterLink} to="/settings/password" variant="outlined" size="small">Change Password</Button>
+            </Box>
           </Box>
         </Paper>
 

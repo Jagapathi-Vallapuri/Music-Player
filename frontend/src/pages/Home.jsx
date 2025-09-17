@@ -1,5 +1,6 @@
 import React from 'react';
 import { Container, Typography, Box, Button, Stack, Paper } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 
 const Home = () => {
@@ -57,8 +58,8 @@ const Home = () => {
               Stream, explore, and manage your playlists securely with two-factor authentication and a sleek modern interface.
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ pt: 2 }}>
-              <Button variant="contained" size="large" color="primary">Get Started</Button>
-              <Button variant="outlined" size="large" color="secondary">Browse Library</Button>
+              <Button component={RouterLink} to="/register" variant="contained" size="large" color="primary">Get Started</Button>
+              <Button component={RouterLink} to="/home" variant="outlined" size="large" color="secondary">Browse Library</Button>
             </Stack>
           </Stack>
         </Paper>

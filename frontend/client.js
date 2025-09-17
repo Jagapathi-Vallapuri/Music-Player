@@ -118,4 +118,13 @@ export const deleteAvatar = async () => {
     }
 };
 
+export const changePassword = async (currentPassword, newPassword) => {
+    try {
+        const res = await api.post('/auth/change-password', { currentPassword, newPassword });
+        return res.data;
+    } catch (err) {
+        throw new Error(err.response?.data?.message || 'Failed to change password');
+    }
+};
+
 export default api;
