@@ -1,14 +1,40 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { injectLogoutHandler } from '../../client.js';
+import { useUI } from './UIContext.jsx';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+  const { toastInfo } = useUI();
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const expiryTimerRef = useRef(null);
   const navigate = useNavigate();
+
+  const scheduleAutoLogout = (jwtToken) => {
+    try {
+      if (!jwtToken) return;
+      const [, payloadB64] = jwtToken.split('.');
+      if (!payloadB64) return;
+      const json = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+      if (!json?.exp) return;
+      const msUntilExpiry = json.exp * 1000 - Date.now();
+      if (msUntilExpiry <= 0) {
+        toastInfo?.('Session expired. Please sign in again.');
+        logout();
+        return;
+      }
+      if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+      expiryTimerRef.current = setTimeout(() => {
+        toastInfo?.('Session expired. Please sign in again.');
+        logout();
+      }, msUntilExpiry);
+    } catch (_) {
+      // ignore decode errors
+    }
+  };
 
   useEffect(() => {
     injectLogoutHandler(() => logout(false));
@@ -17,7 +43,10 @@ export const AuthProvider = ({ children }) => {
       try {
         const t = localStorage.getItem('token');
         const u = localStorage.getItem('user');
-        if (t) setToken(t);
+        if (t) {
+          setToken(t);
+          scheduleAutoLogout(t);
+        }
         if (u) setUser(JSON.parse(u));
         if (t) {
           try {
@@ -52,9 +81,14 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(newUser));
     }
+    scheduleAutoLogout(newToken);
   };
 
   const logout = (navigateAway = true) => {
+    if (expiryTimerRef.current) {
+      clearTimeout(expiryTimerRef.current);
+      expiryTimerRef.current = null;
+    }
     setToken(null);
     setUser(null);
     if (typeof window !== 'undefined') {

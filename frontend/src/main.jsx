@@ -5,6 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { PlayerProvider } from './context/PlayerContext.jsx';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
 import { UIProvider } from './context/UIContext.jsx';
 
@@ -25,7 +26,9 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
       <UIProvider>
-        <AppWrapper />
+        <PlayerProvider>
+          <AppWrapper />
+        </PlayerProvider>
       </UIProvider>
     </ThemeProvider>
   </StrictMode>,

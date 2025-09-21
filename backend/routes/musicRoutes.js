@@ -5,7 +5,8 @@ const {
     search,
     getTrackDetails,
     getPopularTracks,
-    getAlbums
+    getAlbums,
+    getAlbum
 } = require('../controllers/musicController');
 
 const { searchLimiter } = require('../middleware/rateLimitMiddleware');
@@ -18,5 +19,6 @@ router.get('/search', searchLimiter, validateSearchQuery, search);
 router.get('/track/:id', validateTrackParam, getTrackDetails);
 router.get('/popular', getPopularTracks);
 router.get('/albums', getAlbums);
+router.get('/albums/:id', getAlbum);
 
 module.exports = router;

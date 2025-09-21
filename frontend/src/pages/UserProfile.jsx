@@ -17,7 +17,7 @@ const metrics = [
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); 
   const { updateUser } = useAuth();
   const [aboutEdit, setAboutEdit] = useState(false);
   const [aboutValue, setAboutValue] = useState('');

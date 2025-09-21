@@ -1,4 +1,5 @@
-const { searchTracks, getTrackById, getPopular, getAlbums: fetchAlbums, getTracksByIds: fetchTracksByIdsService } = require('../services/jamendoService');
+// Switched provider from Jamendo to Spotify. Contracts remain the same for controllers.
+const { searchTracks, getTrackById, getPopular, getAlbums: fetchAlbums, getTracksByIds: fetchTracksByIdsService, getAlbumById } = require('../services/spotifyService');
 
 
 const search = async (req, res) => {
@@ -45,6 +46,17 @@ const getAlbums = async (req, res) => {
     }
 };
 
+const getAlbum = async (req, res) => {
+	try {
+		const { id } = req.params;
+		const album = await getAlbumById(id);
+		if (!album) return res.status(404).json({ message: 'Album not found' });
+		res.json(album);
+	} catch (err) {
+		res.status(500).json({ message: 'Failed to get album', error: err.message });
+	}
+};
+
 const getTracksByIds = async (req, res) => {
     try {
         const { ids } = req.query;
@@ -65,7 +77,8 @@ module.exports = {
 	search,
 	getTrackDetails,
 	getPopularTracks,
-    getAlbums,
+	getAlbums,
+	getAlbum,
     getTracksByIds
 };
 

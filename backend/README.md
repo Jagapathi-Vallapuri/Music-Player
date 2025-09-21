@@ -114,3 +114,22 @@ For full details of each route and payloads, inspect the `routes/` and `controll
 - If the server exits on startup, check env var validation output for the missing variable.
 - If email 2FA messages are not arriving, validate SMTP settings and check `emailService.js` logs.
 - For Redis issues, verify `REDIS_URL` connectivity and that the Redis server supports EVAL commands (standard Redis does).
+
+## Spotify Web API configuration
+
+This backend uses Spotify Web API (Client Credentials flow) for music data.
+
+Add the following to your `.env`:
+
+```dotenv
+SPOTIFY_CLIENT_ID=<spotify-client-id>
+SPOTIFY_CLIENT_SECRET=<spotify-client-secret>
+# Optional defaults
+SPOTIFY_MARKET=US
+# Optional: predefine a playlist for popular tracks (e.g., Global Top 50)
+# SPOTIFY_POPULAR_PLAYLIST_ID=37i9dQZEVXbMDoHDwVN2tF
+```
+
+Notes:
+- Only non-user endpoints are accessed (no refresh tokens). A 30s `preview_url` is returned for tracks when available.
+- Ensure your app is created in the Spotify Developer Dashboard and credentials are set in a secure way.

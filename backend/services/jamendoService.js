@@ -111,6 +111,42 @@ const getAlbums = () => {
     })), 3600);
 };
 
+const getAlbumById = (id) => {
+    const normId = String(id).trim();
+    return withCache(`album:${normId}`, async () => {
+        const response = await axios.get(`${JAMENDO_API_BASE}/albums/tracks`, {
+            params: {
+                client_id: CLIENT_ID,
+                format: 'json',
+                id: normId,
+                include: 'musicinfo+stats'
+            }
+        });
+        return response.data.results?.[0] || null;
+    }, (album) => {
+        if (!album) return null;
+        return {
+            id: album.id,
+            name: album.name,
+            artist: decodeHtmlEntities(album.artist_name),
+            image: album.image,
+            stats: {
+                favorited: album.stats?.favorited || 0,
+                likes: album.stats?.likes || 0,
+            },
+            tracks: (album.tracks || []).map(t => ({
+                id: t.id,
+                name: t.name,
+                artist: decodeHtmlEntities(t.artist_name),
+                duration: t.duration,
+                audioUrl: t.audio,
+                image: t.image,
+                album: t.album_name,
+            }))
+        };
+    }, 3600);
+};
+
 const getTracksByIds = (ids) => {
     const idsArr = Array.isArray(ids) ? ids.map(String).map(s => s.trim()) : String(ids).split(',').map(s => s.trim());
     const sorted = idsArr.slice().sort();
@@ -130,4 +166,4 @@ const getTracksByIds = (ids) => {
     }, null, 21600);
 };
 
-module.exports = { searchTracks, getTrackById, getPopular, getAlbums, getTracksByIds };
+module.exports = { searchTracks, getTrackById, getPopular, getAlbums, getTracksByIds, getAlbumById };
