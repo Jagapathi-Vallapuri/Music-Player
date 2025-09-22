@@ -128,3 +128,23 @@ export const changePassword = async (currentPassword, newPassword) => {
 };
 
 export default api;
+
+// Songs API helpers
+export const uploadUserSong = async ({ file, cover, title }) => {
+    const form = new FormData();
+    form.append('song', file);
+    if (cover) form.append('cover', cover);
+    if (title) form.append('title', title);
+    const res = await api.post('/songs/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return res.data;
+};
+
+export const getMySongs = async () => {
+    const res = await api.get('/songs');
+    return res.data;
+};
+
+export const deleteMySong = async (filename) => {
+    const res = await api.delete(`/songs/${encodeURIComponent(filename)}`);
+    return res.data;
+};

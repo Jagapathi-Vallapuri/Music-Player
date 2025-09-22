@@ -85,6 +85,12 @@ const validatePlaylist = [
     .withMessage('Track ID cannot be empty')
     .isNumeric()
     .withMessage('Each track ID must be a number'),
+
+  body('coverUrl')
+    .optional()
+    .isString()
+    .isLength({ max: 500 })
+    .withMessage('coverUrl must be a string up to 500 characters'),
   
   handleValidationErrors
 ];
@@ -112,6 +118,12 @@ const validatePlaylistUpdate = [
     .withMessage('Track ID cannot be empty')
     .isNumeric()
     .withMessage('Each track ID must be a number'),
+
+  body('coverUrl')
+    .optional()
+    .isString()
+    .isLength({ max: 500 })
+    .withMessage('coverUrl must be a string up to 500 characters'),
   
   handleValidationErrors
 ];

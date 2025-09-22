@@ -57,9 +57,12 @@ const PlayerBar = () => {
             <SkipNextIcon />
           </IconButton>
           <Tooltip title="Shuffle upcoming">
-            <IconButton onClick={shuffleUpcoming} aria-label="Shuffle" size="small" sx={{ color: uiColor }} disabled={!queue || queue.length <= 2}>
-              <ShuffleIcon />
-            </IconButton>
+            {/* MUI recommends wrapping disabled button in a span for Tooltip */}
+            <span>
+              <IconButton onClick={shuffleUpcoming} aria-label="Shuffle" size="small" sx={{ color: uiColor }} disabled={!queue || queue.length <= 2}>
+                <ShuffleIcon />
+              </IconButton>
+            </span>
           </Tooltip>
           <Tooltip title="Queue">
             <IconButton onClick={() => setQueueOpen(true)} aria-label="Open queue" size="small" sx={{ color: uiColor }}>

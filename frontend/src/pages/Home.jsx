@@ -74,7 +74,7 @@ const Home = () => {
                 {/* Popular Section */}
                 <Stack spacing={2} sx={{ mb: 4 }}>
                     <Stack direction="row" alignItems="baseline" justifyContent="space-between">
-                        <Typography variant="h5" sx={{ fontWeight: 700 }}>Popular Right Now</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>Most Streamed This Week</Typography>
                         <Button component={RouterLink} to="/popular" variant="text">View all</Button>
                     </Stack>
                     {popular.loading ? (

@@ -1,5 +1,5 @@
 // Using Jamendo as the music provider. Controller contracts remain the same.
-const { searchTracks, getTrackById, getPopular, getAlbums: fetchAlbums, getTracksByIds: fetchTracksByIdsService, getAlbumById } = require('../services/jamendoService');
+const { searchTracks, getTrackById, getPopular, getAlbums: fetchAlbums, getTracksByIds: fetchTracksByIdsService, getAlbumById, getAlbumsByCategories } = require('../services/jamendoService');
 const axios = require('axios');
 
 
@@ -34,7 +34,7 @@ const getPopularTracks = async (req, res) => {
 		const tracks = await getPopular();
 		res.json(tracks);
 	} catch (err) {
-		res.status(500).json({ message: 'Failed to get popular tracks', error: err.message });
+		res.status(500).json({ message: `Failed to get popular tracks: ${err.message}`, error: err.message, code: err.code });
 	}
 };
 
@@ -43,7 +43,7 @@ const getAlbums = async (req, res) => {
         const albums = await fetchAlbums();
         res.json(albums);
     } catch (err) {
-        res.status(500).json({ message: 'Failed to get albums', error: err.message });
+		res.status(500).json({ message: `Failed to get albums: ${err.message}`, error: err.message, code: err.code });
     }
 };
 
@@ -54,7 +54,20 @@ const getAlbum = async (req, res) => {
 		if (!album) return res.status(404).json({ message: 'Album not found' });
 		res.json(album);
 	} catch (err) {
-		res.status(500).json({ message: 'Failed to get album', error: err.message });
+		res.status(500).json({ message: `Failed to get album: ${err.message}` , error: err.message, code: err.code });
+	}
+};
+
+// GET /api/music/albums/by-categories?cats=rock,pop,jazz&per=5
+const getAlbumsPerCategories = async (req, res) => {
+	try {
+		const cats = req.query.cats || '';
+		const per = Number(req.query.per) || 5;
+		if (!cats) return res.status(400).json({ message: 'Missing query parameter ?cats=genre1,genre2' });
+		const data = await getAlbumsByCategories(cats, per);
+		res.json(data);
+	} catch (err) {
+		res.status(500).json({ message: `Failed to get albums by categories: ${err.message}`, error: err.message, code: err.code });
 	}
 };
 
@@ -68,8 +81,8 @@ const getTracksByIds = async (req, res) => {
         const tracks = await fetchTracksByIdsService(trackIds);
         res.json(tracks);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Failed to get tracks by IDs', error: err.message });
+		console.error(err);
+		res.status(500).json({ message: `Failed to get tracks by IDs: ${err.message}`, error: err.message, code: err.code });
     }
 };
 
@@ -80,7 +93,8 @@ module.exports = {
 	getPopularTracks,
 	getAlbums,
 	getAlbum,
-		getTracksByIds
+	getTracksByIds,
+    getAlbumsPerCategories
 };
 
 // Stream/proxy external audio (e.g., Jamendo) to bypass CORS and support Range requests

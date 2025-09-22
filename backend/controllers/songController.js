@@ -16,16 +16,45 @@ const User = require('../models/User');
 
 const uploadSong = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+    const songFile = req.files?.song?.[0];
+    const coverFile = req.files?.cover?.[0];
+    const { title } = req.body || {};
+    if (!songFile) {
+      return res.status(400).json({ message: 'No audio file uploaded' });
     }
 
+    // Basic audio-only validation
+    if (!songFile.mimetype || !songFile.mimetype.startsWith('audio/')) {
+      return res.status(400).json({ message: 'Uploaded file must be an audio file' });
+    }
+    if (coverFile && !coverFile.mimetype?.startsWith('image/')) {
+      return res.status(400).json({ message: 'Cover must be an image' });
+    }
+
+    // Compute a simple curation score
+    const titleLen = typeof title === 'string' ? title.trim().length : 0;
+    const hasCover = !!coverFile;
+    const preferredAudio = /mp3|mpeg|aac|flac|wav|ogg/.test(songFile.mimetype);
+    const sizeQuality = songFile.size > 15 * 1024 * 1024 ? 'large' : songFile.size > 2 * 1024 * 1024 ? 'ok' : 'small';
+    const curationScore = (hasCover ? 40 : 0) + Math.min(30, Math.floor(titleLen / 2)) + (preferredAudio ? 20 : 5) + (sizeQuality === 'ok' ? 10 : sizeQuality === 'large' ? 5 : 0);
+
     const songData = {
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      size: req.file.size,
-      mimeType: req.file.mimetype,
-      gridfsId: req.file.id
+      filename: songFile.filename,
+      originalName: songFile.originalname,
+      size: songFile.size,
+      mimeType: songFile.mimetype,
+      gridfsId: songFile.id,
+      title: typeof title === 'string' ? title.trim() : undefined,
+      coverFilename: coverFile?.filename,
+      coverMimeType: coverFile?.mimetype,
+      coverGridfsId: coverFile?.id,
+      curationScore,
+      curation: {
+        hasCover,
+        titleLength: titleLen,
+        preferredAudio,
+        sizeQuality,
+      }
     };
 
     await User.findByIdAndUpdate(req.user._id, {
@@ -104,9 +133,37 @@ const streamSong = async (req, res) => {
   }
 };
 
+// Stream cover image by filename (re-use the same collection)
+const streamCover = async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const user = await User.findById(req.user._id);
+
+    const entry = user.uploadedSongs.find(s => s.coverFilename === filename);
+    if (!entry || !entry.coverGridfsId) {
+      return res.status(404).json({ message: 'Cover not found' });
+    }
+
+    const readstream = gfs.createReadStream({
+      _id: entry.coverGridfsId,
+      root: 'uploads'
+    });
+
+    readstream.on('error', (err) => {
+      res.status(500).json({ message: 'Stream error', error: err.message });
+    });
+
+    res.set('Content-Type', entry.coverMimeType || 'image/jpeg');
+    readstream.pipe(res);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to stream cover', error: err.message });
+  }
+};
+
 module.exports = {
   uploadSong,
   getUserSongs,
   deleteSong,
-  streamSong
+  streamSong,
+  streamCover
 };

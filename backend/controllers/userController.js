@@ -82,9 +82,9 @@ const removeFromFavorites = async (req, res) => {
 
 const createPlaylist = async (req, res) => {
     try {
-        const { name, tracks } = req.body;
+        const { name, tracks, coverUrl } = req.body;
         const userId = req.user._id;
-        const playlist = new Playlist({ userId, name, tracks });
+        const playlist = new Playlist({ userId, name, tracks, coverUrl });
         await playlist.save();
         await updateUserAndClearCache(userId, { $push: { playlists: playlist._id } });
         res.status(201).json(playlist);
@@ -118,16 +118,27 @@ const deletePlaylist = async (req, res) => {
 const updatePlaylist = async (req, res) => {
     try {
         const { id: playlistId } = req.params;
-        const { name, tracks } = req.body;
+        const { name, tracks, coverUrl } = req.body;
         const playlist = await Playlist.findOneAndUpdate(
             { _id: playlistId, userId: req.user._id },
-            { name, tracks },
+            { name, tracks, coverUrl },
             { new: true }
         );
         if (!playlist) return res.status(404).json({ message: 'Playlist not found or unauthorized' });
         res.json(playlist);
     } catch (err) {
         res.status(500).json({ message: 'Error updating playlist', error: err.message });
+    }
+};
+
+const getPlaylistById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const playlist = await Playlist.findOne({ _id: id, userId: req.user._id });
+        if (!playlist) return res.status(404).json({ message: 'Playlist not found or unauthorized' });
+        res.json(playlist);
+    } catch (err) {
+        res.status(500).json({ message: 'Error fetching playlist', error: err.message });
     }
 };
 
@@ -211,6 +222,7 @@ module.exports = {
     getUserPlaylists,
     deletePlaylist,
     updatePlaylist,
+    getPlaylistById,
     uploadAvatar,
     getAvatar,
     deleteAvatar,

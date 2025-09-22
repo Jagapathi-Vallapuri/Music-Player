@@ -10,7 +10,7 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
-import { Avatar } from '@mui/material';
+import { Avatar, TextField, InputAdornment } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
 const Header = ({ title = 'Pulse' }) => {
@@ -67,6 +67,27 @@ const Header = ({ title = 'Pulse' }) => {
           
           {auth && auth.isAuthenticated ? (
             <>
+              <Box component="form" onSubmit={(e) => {
+                e.preventDefault();
+                const data = new FormData(e.currentTarget);
+                const q = (data.get('q') || '').toString().trim();
+                if (!q) return;
+                window.location.href = `/search?q=${encodeURIComponent(q)}`;
+              }} sx={{ mx: 1, display: { xs: 'none', sm: 'block' } }}>
+                <TextField
+                  name="q"
+                  size="small"
+                  placeholder="Search..."
+                  InputProps={{
+                    sx: { bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'white', borderRadius: 2, minWidth: 220 },
+                    endAdornment: <InputAdornment position="end">↵</InputAdornment>
+                  }}
+                />
+              </Box>
+              <Button color="inherit" component={RouterLink} to="/home">Home</Button>
+              <Button color="inherit" component={RouterLink} to="/albums">Albums</Button>
+              <Button color="inherit" component={RouterLink} to="/playlists">Playlists</Button>
+              <Button color="inherit" component={RouterLink} to="/upload">Upload</Button>
               <Box component={RouterLink} to="/profile" sx={{
                 display: 'flex',
                 alignItems: 'center',

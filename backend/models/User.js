@@ -23,7 +23,20 @@ const userSchema = new mongoose.Schema({
         size: { type: Number, required: true },
         mimeType: { type: String, required: true },
         uploadDate: { type: Date, default: Date.now },
-        gridfsId: { type: mongoose.Schema.Types.ObjectId }
+        gridfsId: { type: mongoose.Schema.Types.ObjectId },
+        // Optional metadata
+        title: { type: String },
+        coverFilename: { type: String },
+        coverMimeType: { type: String },
+        coverGridfsId: { type: mongoose.Schema.Types.ObjectId },
+        // Curation metrics
+        curationScore: { type: Number, default: 0 },
+        curation: {
+            hasCover: { type: Boolean, default: false },
+            titleLength: { type: Number, default: 0 },
+            preferredAudio: { type: Boolean, default: false },
+            sizeQuality: { type: String, enum: ['small','ok','large','unknown'], default: 'unknown' }
+        }
     }]
 });
 

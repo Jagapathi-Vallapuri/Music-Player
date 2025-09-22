@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { Box, Container, Typography, Stack, Paper, Avatar, Skeleton, Button, Divider, List, ListItem, ListItemAvatar, ListItemText, ListItemButton } from '@mui/material';
+import { Box, Container, Typography, Stack, Paper, Avatar, Skeleton, Button, Divider, List, ListItem, ListItemAvatar, ListItemText, ListItemButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
 import api from '../../client.js';
 import { usePlayer } from '../context/PlayerContext.jsx';
 import { useUI } from '../context/UIContext.jsx';
@@ -10,6 +10,11 @@ const AlbumPage = () => {
   const { toastError } = useUI();
   const { playQueue, enqueue, playNow } = usePlayer();
   const [state, setState] = useState({ loading: true, data: null });
+  const [dlg, setDlg] = useState({ open: false, mode: 'album', track: null });
+  const [playlists, setPlaylists] = useState([]);
+  const [selectedId, setSelectedId] = useState('');
+  const [newName, setNewName] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -28,6 +33,50 @@ const AlbumPage = () => {
     })();
     return () => ac.abort();
   }, [id, toastError]);
+
+  const openAddDialog = async (mode, track = null) => {
+    setDlg({ open: true, mode, track });
+    try {
+      const res = await api.get('/users/playlists');
+      setPlaylists(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      toastError(err?.response?.data?.message || 'Failed to load playlists');
+    }
+  };
+
+  const closeAddDialog = () => {
+    setDlg({ open: false, mode: 'album', track: null });
+    setSelectedId('');
+    setNewName('');
+    setSaving(false);
+  };
+
+  const confirmAdd = async () => {
+    try {
+      setSaving(true);
+      let targetId = selectedId;
+      // Create a new playlist if name provided and no selection
+      if (!targetId && newName.trim()) {
+        const coverUrl = state.data?.image || undefined;
+        const cre = await api.post('/users/playlists', { name: newName.trim(), tracks: [], coverUrl });
+        targetId = cre.data?._id;
+      }
+      if (!targetId) return;
+      // Compute tracks to add
+      const toAdd = dlg.mode === 'album' ? (state.data?.tracks || []) : [dlg.track];
+      const ids = toAdd.map((t) => String(t.id));
+      // Fetch current playlist, append, and save
+      const plRes = await api.get(`/users/playlists/${encodeURIComponent(targetId)}`);
+      const current = plRes.data || {};
+      const nextTracks = [...(current.tracks || [])];
+      ids.forEach((id) => { if (!nextTracks.includes(id)) nextTracks.push(id); });
+      await api.put(`/users/playlists/${encodeURIComponent(targetId)}`, { name: current.name, tracks: nextTracks, coverUrl: current.coverUrl });
+      closeAddDialog();
+    } catch (err) {
+      toastError(err?.response?.data?.message || 'Failed to add to playlist');
+      setSaving(false);
+    }
+  };
 
   const album = state.data;
   const header = (
@@ -52,6 +101,7 @@ const AlbumPage = () => {
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
           <Button variant="contained" onClick={() => playNow(album.tracks)}>Play now</Button>
           <Button variant="outlined" onClick={() => enqueue(album.tracks)}>Add to queue</Button>
+          <Button variant="outlined" onClick={() => openAddDialog('album')}>Add album to playlist</Button>
         </Stack>
       ) : null}
       <Button component={RouterLink} to="/albums" variant="outlined">Back to albums</Button>
@@ -75,7 +125,12 @@ const AlbumPage = () => {
           <List>
             {album.tracks.map((t, idx) => (
               <React.Fragment key={t.id || idx}>
-                <ListItem disablePadding>
+                <ListItem
+                  disablePadding
+                  secondaryAction={
+                    <Button size="small" onClick={() => openAddDialog('track', t)}>Add to playlist</Button>
+                  }
+                >
                   <ListItemButton onClick={() => playQueue(album.tracks, idx)}>
                   <ListItemAvatar>
                     <Avatar variant="rounded" src={t.image} alt={t.name} />
@@ -93,6 +148,28 @@ const AlbumPage = () => {
           </List>
         )}
       </Paper>
+      <Dialog open={dlg.open} onClose={closeAddDialog} fullWidth maxWidth="xs">
+        <DialogTitle>Add to playlist</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <FormControl fullWidth>
+              <InputLabel id="pl-select-label">Select playlist</InputLabel>
+              <Select labelId="pl-select-label" label="Select playlist" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+                {playlists.map((p) => (
+                  <MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Typography align="center" color="text.secondary">— or —</Typography>
+            <TextField label="New playlist name" value={newName} onChange={(e) => setNewName(e.target.value)} fullWidth />
+            {state.data?.image && <Typography variant="caption" color="text.secondary">New playlists will use this album cover by default.</Typography>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeAddDialog} disabled={saving}>Cancel</Button>
+          <Button onClick={confirmAdd} variant="contained" disabled={saving || (!selectedId && !newName.trim())}>Add</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
