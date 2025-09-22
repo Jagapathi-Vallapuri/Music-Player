@@ -6,6 +6,8 @@ const playlistSchema = new mongoose.Schema({
   tracks: [String],
   // Optional cover image URL for the playlist
   coverUrl: { type: String },
+  // Optional description
+  description: { type: String },
   createdAt: { type: Date, default: Date.now }
 }, { collection: 'playlists' });
 

@@ -82,9 +82,9 @@ const removeFromFavorites = async (req, res) => {
 
 const createPlaylist = async (req, res) => {
     try {
-        const { name, tracks, coverUrl } = req.body;
+    const { name, tracks, coverUrl, description } = req.body;
         const userId = req.user._id;
-        const playlist = new Playlist({ userId, name, tracks, coverUrl });
+    const playlist = new Playlist({ userId, name, tracks, coverUrl, description });
         await playlist.save();
         await updateUserAndClearCache(userId, { $push: { playlists: playlist._id } });
         res.status(201).json(playlist);
@@ -118,10 +118,10 @@ const deletePlaylist = async (req, res) => {
 const updatePlaylist = async (req, res) => {
     try {
         const { id: playlistId } = req.params;
-        const { name, tracks, coverUrl } = req.body;
+        const { name, tracks, coverUrl, description } = req.body;
         const playlist = await Playlist.findOneAndUpdate(
             { _id: playlistId, userId: req.user._id },
-            { name, tracks, coverUrl },
+            { name, tracks, coverUrl, description },
             { new: true }
         );
         if (!playlist) return res.status(404).json({ message: 'Playlist not found or unauthorized' });
@@ -229,4 +229,48 @@ module.exports = {
     updateAbout,
     getMe,
     upload // export upload middleware for route wiring
+};
+
+// ===== Playlist cover upload setup =====
+const coversDir = path.join(__dirname, '..', 'uploads', 'playlist-covers');
+if (!fs.existsSync(coversDir)) {
+    fs.mkdirSync(coversDir, { recursive: true });
+}
+
+const coverStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, coversDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname) || '.png';
+        cb(null, `${req.user._id}-${Date.now()}${ext}`);
+    }
+});
+
+const uploadPlaylistCover = multer({ storage: coverStorage, limits: { fileSize: 3 * 1024 * 1024 }, fileFilter: imageFileFilter });
+
+module.exports.uploadPlaylistCover = uploadPlaylistCover;
+
+module.exports.setPlaylistCover = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+        const playlist = await Playlist.findOne({ _id: id, userId: req.user._id });
+        if (!playlist) return res.status(404).json({ message: 'Playlist not found or unauthorized' });
+        // If coverUrl points to our uploads dir, attempt to clean up old file
+        if (playlist.coverUrl) {
+            try {
+                const maybePath = playlist.coverUrl.split('/api/uploads/')[1];
+                if (maybePath) {
+                    const full = path.join(__dirname, '..', 'uploads', maybePath);
+                    if (fs.existsSync(full)) fs.unlink(full, () => {});
+                }
+            } catch {}
+        }
+        const relPath = `playlist-covers/${req.file.filename}`;
+        const coverUrl = `/api/uploads/${relPath}`;
+        playlist.coverUrl = coverUrl;
+        await playlist.save();
+        res.json({ message: 'Cover updated', coverUrl });
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to set cover', error: err.message });
+    }
 };

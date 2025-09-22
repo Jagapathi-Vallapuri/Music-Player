@@ -35,6 +35,7 @@ function App() {
                     <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
                     <Route path="/playlists" element={<ProtectedRoute><PlaylistsPage /></ProtectedRoute>} />
                     <Route path="/playlists/:id" element={<ProtectedRoute><PlaylistDetailPage /></ProtectedRoute>} />
+                    <Route path="/playlist/:id" element={<ProtectedRoute><PlaylistDetailPage /></ProtectedRoute>} />
                     <Route path="/upload" element={<ProtectedRoute><UploadSongPage /></ProtectedRoute>} />
                     <Route path="/album/:id" element={<ProtectedRoute><AlbumPage /></ProtectedRoute>} />
                     <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />

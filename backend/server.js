@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const path = require('path');
 
 require('dotenv').config();
 
@@ -41,6 +42,9 @@ app.use(cors({
 }));
 
 app.use(generalLimiter);
+
+// Serve uploaded assets (e.g., avatars, playlist covers)
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);

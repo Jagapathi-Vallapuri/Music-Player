@@ -91,6 +91,12 @@ const validatePlaylist = [
     .isString()
     .isLength({ max: 500 })
     .withMessage('coverUrl must be a string up to 500 characters'),
+
+  body('description')
+    .optional()
+    .isString()
+    .isLength({ max: 1000 })
+    .withMessage('description must be a string up to 1000 characters'),
   
   handleValidationErrors
 ];
@@ -124,6 +130,12 @@ const validatePlaylistUpdate = [
     .isString()
     .isLength({ max: 500 })
     .withMessage('coverUrl must be a string up to 500 characters'),
+
+  body('description')
+    .optional()
+    .isString()
+    .isLength({ max: 1000 })
+    .withMessage('description must be a string up to 1000 characters'),
   
   handleValidationErrors
 ];
