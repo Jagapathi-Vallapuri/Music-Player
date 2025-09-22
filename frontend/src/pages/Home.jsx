@@ -12,7 +12,7 @@ import { useUI } from '../context/UIContext.jsx';
 
 const Home = () => {
     const { toastError } = useUI();
-        const { playTrack } = usePlayer();
+    const { playTrack } = usePlayer();
     const navigate = useNavigate();
     const [popular, setPopular] = useState({ loading: true, data: [] });
     const [albums, setAlbums] = useState({ loading: true, data: [] });
@@ -83,7 +83,7 @@ const Home = () => {
                         </Stack>
                     ) : (
                                     <Carousel ariaLabel="popular-tracks">
-                                        {popular.data.map((t) => {
+                                        {popular.data.map((t, idx) => {
                                             const track = {
                                                 id: t.id || t.track_id || t.title,
                                                 title: t.title || t.name,

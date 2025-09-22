@@ -6,7 +6,8 @@ const {
     getTrackDetails,
     getPopularTracks,
     getAlbums,
-    getAlbum
+    getAlbum,
+    streamAudio,
 } = require('../controllers/musicController');
 
 const { searchLimiter } = require('../middleware/rateLimitMiddleware');
@@ -20,5 +21,6 @@ router.get('/track/:id', validateTrackParam, getTrackDetails);
 router.get('/popular', getPopularTracks);
 router.get('/albums', getAlbums);
 router.get('/albums/:id', getAlbum);
+router.get('/stream', streamAudio);
 
 module.exports = router;

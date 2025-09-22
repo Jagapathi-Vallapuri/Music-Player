@@ -47,7 +47,8 @@ const getTrackById = (id) => {
                 client_id: CLIENT_ID,
                 id: normId,
                 format: 'json',
-                include: 'musicinfo+stats'
+                include: 'musicinfo',
+                audioformat: 'mp3'
             }
         });
         const track = response.data.results[0];
@@ -66,7 +67,8 @@ const getPopular = () => {
                 format: 'json',
                 order: 'popularity_total',
                 limit: 30,
-                include: 'musicinfo+stats'
+                include: 'musicinfo',
+                audioformat: 'mp3'
             }
         });
         return response.data.results;
@@ -78,11 +80,7 @@ const getPopular = () => {
         image: track.image,
         duration: track.duration,
         album: track.album_name,
-        genres: track.musicinfo?.tags?.genres || [],
-        stats: {
-            favorited: track.stats?.favorited || 0,
-            likes: track.stats?.likes || 0,
-        }
+        genres: track.musicinfo?.tags?.genres || []
     })), 1800);
 };
 
@@ -94,7 +92,8 @@ const getAlbums = () => {
                 format: 'json',
                 order: 'popularity_total',
                 limit: 10,
-                include: 'musicinfo+stats'
+                include: 'musicinfo',
+                audioformat: 'mp3'
             }
         });
         return response.data.results;
@@ -103,11 +102,7 @@ const getAlbums = () => {
         name: album.name,
         artist: decodeHtmlEntities(album.artist_name),
         image: album.image,
-        tracks: album.tracks,
-        stats: {
-            favorited: album.stats?.favorited || 0,
-            likes: album.stats?.likes || 0,
-        }
+        tracks: album.tracks
     })), 3600);
 };
 
@@ -119,7 +114,8 @@ const getAlbumById = (id) => {
                 client_id: CLIENT_ID,
                 format: 'json',
                 id: normId,
-                include: 'musicinfo+stats'
+                include: 'musicinfo',
+                audioformat: 'mp3'
             }
         });
         return response.data.results?.[0] || null;
@@ -130,10 +126,6 @@ const getAlbumById = (id) => {
             name: album.name,
             artist: decodeHtmlEntities(album.artist_name),
             image: album.image,
-            stats: {
-                favorited: album.stats?.favorited || 0,
-                likes: album.stats?.likes || 0,
-            },
             tracks: (album.tracks || []).map(t => ({
                 id: t.id,
                 name: t.name,
@@ -156,7 +148,7 @@ const getTracksByIds = (ids) => {
                 client_id: CLIENT_ID,
                 id: sorted.join('+'),
                 format: 'json',
-                include: 'musicinfo+stats'
+                include: 'musicinfo'
             }
         });
         return response.data.results.map(track => ({

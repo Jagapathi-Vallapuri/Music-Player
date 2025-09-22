@@ -1,6 +1,6 @@
-# Pulse — Backend
+# Music-Player — Backend
 
-This folder contains the backend REST API for the Pulse application (Express + MongoDB + Redis). This README is a concise developer guide to get the backend running locally, explains the 2FA session flow, and includes operational and security notes.
+This folder contains the backend REST API for the Music-Player application (Express + MongoDB + Redis). This README is a concise developer guide to get the backend running locally, explains the 2FA session flow, and documents the Jamendo integration and audio streaming proxy.
 
 ## Quick start
 
@@ -32,6 +32,12 @@ SMTP_SECURE=true
 SMTP_USER=you@example.com
 SMTP_PASS=secret
 SMTP_FROM="Pulse <no-reply@example.com>"
+
+# CORS
+FRONTEND_ORIGIN=http://localhost:5173
+
+# Jamendo API
+JAMENDO_CLIENT_ID=<your-jamendo-client-id>
 ```
 
 Notes:
@@ -97,7 +103,7 @@ Key folders and files:
 Base path: `/api`
 
 - Auth: `POST /auth/register`, `POST /auth/login`, `POST /auth/verify-2fa`, `POST /auth/change-password`
-- Music: `GET /music/search`, `GET /music/track/:id`, `GET /music/popular`
+- Music: `GET /music/search`, `GET /music/track/:id`, `GET /music/popular`, `GET /music/albums`, `GET /music/albums/:id`, `GET /music/stream?src=<jamendo-audio-url>` (audio proxy with Range support)
 - Users / Playlists / Favorites endpoints under `/users`
 - Songs: upload/stream endpoints under `/songs`
 
@@ -115,21 +121,18 @@ For full details of each route and payloads, inspect the `routes/` and `controll
 - If email 2FA messages are not arriving, validate SMTP settings and check `emailService.js` logs.
 - For Redis issues, verify `REDIS_URL` connectivity and that the Redis server supports EVAL commands (standard Redis does).
 
-## Spotify Web API configuration
+## Jamendo API configuration and audio proxy
 
-This backend uses Spotify Web API (Client Credentials flow) for music data.
+This backend uses the Jamendo API v3.0 for music discovery.
 
 Add the following to your `.env`:
 
 ```dotenv
-SPOTIFY_CLIENT_ID=<spotify-client-id>
-SPOTIFY_CLIENT_SECRET=<spotify-client-secret>
-# Optional defaults
-SPOTIFY_MARKET=US
-# Optional: predefine a playlist for popular tracks (e.g., Global Top 50)
-# SPOTIFY_POPULAR_PLAYLIST_ID=37i9dQZEVXbMDoHDwVN2tF
+JAMENDO_CLIENT_ID=<your-jamendo-client-id>
 ```
 
 Notes:
-- Only non-user endpoints are accessed (no refresh tokens). A 30s `preview_url` is returned for tracks when available.
-- Ensure your app is created in the Spotify Developer Dashboard and credentials are set in a secure way.
+- You can create a Jamendo app to obtain a Client ID at https://devportal.jamendo.com/
+- Endpoints used: `/tracks`, `/albums/tracks` with parameters for popularity ordering, `include=musicinfo`, and `audioformat=mp3` to ensure audio URLs are present.
+- Audio playback is proxied by `GET /api/music/stream?src=<jamendo-audio-url>` to avoid CORS issues and support HTTP Range requests. The proxy whitelists Jamendo storage hosts to mitigate SSRF risks and forwards relevant headers (e.g., Range, Content-Type, Content-Length).
+- Respect Jamendo’s licensing and usage policies; track audio is distributed under various Creative Commons licenses. Ensure your use complies with the specific license for each track.

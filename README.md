@@ -1,18 +1,27 @@
 # Music-Player
 
-A full‑stack music app with Spotify-powered discovery, user authentication, playlists, personal song uploads/streaming, and a global web audio player.
+A full‑stack music app with Jamendo‑powered discovery, user authentication, playlists, personal song uploads/streaming, and a robust global web audio player with queue management.
 
 - Backend: Node.js, Express 5, MongoDB (Mongoose), GridFS (uploads), Redis (caching), Nodemailer (email/2FA)
-- Music provider: Spotify Web API (Client Credentials flow)
+- Music provider: Jamendo API v3.0
 - Frontend: React + Vite + MUI, React Router, Axios
 
 ## Features
 - Email/password auth with optional email 2FA flows (unified verification endpoint)
 - User profile with avatar upload, about, history, favorites, and playlists
-- Discover: Popular tracks, New Releases (Albums), Album details (tracks)
+- Discover: Popular tracks, Albums, Album details (tracks)
 - Personal song upload to MongoDB GridFS and authenticated streaming
 - Rate limiting, request validation, centralized error handling
-- Global audio player (play/pause, progress) with click‑to‑play from pages
+- Global audio player with:
+  - Play/pause, next/prev, seek
+  - Volume control and mute, persisted volume
+  - Queue: play now, add to queue, remove, drag‑to‑reorder, play at index
+  - Shuffle upcoming tracks
+  - Compact PlayerBar with square artwork, theme‑aware colors (light: white controls; dark: black)
+  - Placeholder state when idle; pressing Play starts the current queue
+  - Player is shown only when the user is authenticated
+  - Album page: “Play now” and “Add to queue” buttons; track row click starts playback from that track
+  - Home Popular: clicking a card plays just that single track
 
 ## Monorepo Structure
 ```
@@ -37,7 +46,7 @@ frontend/
 ## Prerequisites
 - Node.js 18+ (recommended)
 - MongoDB connection string (Atlas or self-hosted)
-- Spotify API credentials (Client ID/Secret)
+- Jamendo API Client ID
 - Redis (optional but recommended for caching; app runs even if Redis is unavailable)
 - SMTP account (optional; required for email 2FA/password flows)
 
@@ -63,12 +72,8 @@ JWT_SECRET=replace-with-a-long-random-string
 # CORS
 FRONTEND_ORIGIN=http://localhost:5173
 
-# Spotify (required)
-SPOTIFY_CLIENT_ID=your-spotify-client-id
-SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
-SPOTIFY_MARKET=IN
-# Optional: a playlist to source "popular" tracks from (e.g., Global Top 50)
-# SPOTIFY_POPULAR_PLAYLIST_ID=37i9dQZEVXbMDoHDwVN2tF
+# Jamendo (required)
+JAMENDO_CLIENT_ID=your-jamendo-client-id
 
 # Redis (optional: choose URL or host/port)
 # REDIS_URL=redis://default:<password>@localhost:6379
@@ -86,8 +91,9 @@ SMTP_PASS=your-smtp-password
 SMTP_FROM=no-reply@example.com
 ```
 Notes:
-- If Redis connects successfully, Spotify tokens and API results will be cached.
-- If Redis is unreachable, cache gracefully disables; the app still functions (with more direct API calls).
+- If Redis connects successfully, Jamendo responses are cached.
+- If Redis is unreachable, cache gracefully disables; the app still functions (with direct API calls).
+ - Playback is proxied through the backend to bypass Jamendo storage CORS. The API exposes `/api/music/stream?src=<jamendo-audio-url>` with Range support.
 
 ### Install & Run
 Backend (port 5000):
@@ -117,12 +123,13 @@ Auth
 - GET `/auth/validate` (Bearer token)
 - POST `/auth/change-password` (Bearer token) { currentPassword, newPassword }
 
-Music (Spotify-powered, public)
+Music (Jamendo-powered, public)
 - GET `/music/search?q=<query>`
 - GET `/music/track/:id`
 - GET `/music/popular`
-- GET `/music/albums` (New Releases by market)
+- GET `/music/albums`
 - GET `/music/albums/:id`
+ - GET `/music/stream?src=<jamendo-audio-url>` — streams/proxies Jamendo audio with Range support (used by the frontend player to avoid CORS)
 
 Users (Bearer token required)
 - Profile
@@ -164,6 +171,13 @@ Validation & Errors
 - Axios client (`frontend/client.js`) uses `VITE_API_BASE_URL` (or defaults to `http://localhost:5000/api`) and attaches JWT if present
 - A 401 response triggers a centralized logout handler if wired via `injectLogoutHandler`
 
+Player & Queue
+- PlayerBar is rendered only for authenticated users.
+- Controls: play/pause, next/prev, seek, volume, mute.
+- Queue Drawer: view, play specific track, remove, and drag to reorder. “Shuffle” shuffles upcoming tracks while keeping the current one.
+- Album page includes “Play now” (prioritize album tracks) and “Add to queue”. Clicking a track row starts playback from that index.
+- Home Popular: clicking a card plays that single track.
+
 Environment (frontend `/.env.local`, optional):
 ```
 VITE_API_BASE_URL=http://localhost:5000/api
@@ -176,9 +190,10 @@ Dev Scripts
 
 ## Development Notes
 - CORS: If the frontend runs on a different origin, update `FRONTEND_ORIGIN` in backend `.env` (comma‑separated list allowed)
-- Spotify previews: Some tracks have no `preview_url`; the player will show a user‑friendly message and skip playback
+- Jamendo audio: Track objects include `audio` URLs for streaming when requested with `audioformat=mp3`; respect the specific Creative Commons license of each track.
+- Audio streaming is performed via the backend proxy `/api/music/stream` to support Range requests and avoid CORS issues with Jamendo storage hosts. Only Jamendo hosts are permitted by the proxy as an SSRF safeguard.
 - Authentication: Many user and upload routes require a Bearer token in `Authorization` header
-- Global player: A minimal global bar is wired; seek/queue/next/prev can be added later
+- Global player: Full controls, queue management, shuffle, and theme‑aware UI are implemented.
 - Known UI gaps: "View all" pages for albums/popular may not be implemented yet (router warnings may appear if linked)
 
 ## Production Deployment (outline)
@@ -191,9 +206,9 @@ Dev Scripts
 - 401 Unauthorized on `/auth/validate`: ensure requests include `Authorization: Bearer <token>`; login/2FA must complete successfully to obtain a token
 - CORS blocked: verify `FRONTEND_ORIGIN` includes your frontend origin exactly (scheme, host, and port)
 - Redis errors: app continues without cache; verify `REDIS_URL` or host/port/auth settings
-- Spotify errors: confirm `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` are set; network must reach `accounts.spotify.com` and `api.spotify.com`
+- Jamendo errors or no playback: confirm `JAMENDO_CLIENT_ID` is set; network must reach `api.jamendo.com`; ensure the frontend is using the `/music/stream` proxy (the player replaces Jamendo audio URLs automatically).
 - MongoDB connection: check `MONGO_URL` and whitelist your IP if using Atlas
 
 ## Acknowledgements
-- Spotify Web API
+- Jamendo API
 - Material UI (MUI)

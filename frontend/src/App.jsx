@@ -9,7 +9,12 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Header from './components/Header.jsx';
 import PlayerBar from './components/PlayerBar.jsx';
-import { AuthProvider } from './context/AuthContext.jsx';
+import { AuthProvider, useAuth } from './context/AuthContext.jsx';
+
+const AuthedPlayer = () => {
+    const { isAuthenticated } = useAuth();
+    return isAuthenticated ? <PlayerBar /> : null;
+};
 
 function App() {
 
@@ -25,7 +30,7 @@ function App() {
                     <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
                     <Route path="/settings/password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
                 </Routes>
-                <PlayerBar />
+                <AuthedPlayer />
             </AuthProvider>
         </Router>
     )

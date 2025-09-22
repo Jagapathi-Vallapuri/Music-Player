@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { Box, Container, Typography, Stack, Paper, Avatar, Skeleton, Button, Divider, List, ListItem, ListItemAvatar, ListItemText } from '@mui/material';
+import { Box, Container, Typography, Stack, Paper, Avatar, Skeleton, Button, Divider, List, ListItem, ListItemAvatar, ListItemText, ListItemButton } from '@mui/material';
 import api from '../../client.js';
 import { usePlayer } from '../context/PlayerContext.jsx';
 import { useUI } from '../context/UIContext.jsx';
@@ -8,7 +8,7 @@ import { useUI } from '../context/UIContext.jsx';
 const AlbumPage = () => {
   const { id } = useParams();
   const { toastError } = useUI();
-  const { playTrack } = usePlayer();
+  const { playQueue, enqueue, playNow } = usePlayer();
   const [state, setState] = useState({ loading: true, data: null });
 
   useEffect(() => {
@@ -45,14 +45,15 @@ const AlbumPage = () => {
         <Typography variant="h6" color="text.secondary">
           {state.loading ? <Skeleton width={180} /> : (album?.artist || 'Unknown Artist')}
         </Typography>
-        {!state.loading && (
-          <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">Likes: {album?.stats?.likes ?? 0}</Typography>
-            <Typography variant="body2" color="text.secondary">Favorited: {album?.stats?.favorited ?? 0}</Typography>
-          </Stack>
-        )}
+        {/* Metrics removed */}
       </Box>
       <Box sx={{ flex: 1 }} />
+      {!state.loading && album?.tracks?.length ? (
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          <Button variant="contained" onClick={() => playNow(album.tracks)}>Play now</Button>
+          <Button variant="outlined" onClick={() => enqueue(album.tracks)}>Add to queue</Button>
+        </Stack>
+      ) : null}
       <Button component={RouterLink} to="/albums" variant="outlined">Back to albums</Button>
     </Paper>
   );
@@ -74,7 +75,8 @@ const AlbumPage = () => {
           <List>
             {album.tracks.map((t, idx) => (
               <React.Fragment key={t.id || idx}>
-                <ListItem button onClick={() => playTrack({ id: t.id || t.name, title: t.name, artist: t.artist, image: t.image, audioUrl: t.audioUrl || t.audio || t.preview_url })}>
+                <ListItem disablePadding>
+                  <ListItemButton onClick={() => playQueue(album.tracks, idx)}>
                   <ListItemAvatar>
                     <Avatar variant="rounded" src={t.image} alt={t.name} />
                   </ListItemAvatar>
@@ -83,6 +85,7 @@ const AlbumPage = () => {
                     secondary={t.artist}
                   />
                   <Typography variant="body2" color="text.secondary">{formatDuration(t.duration)}</Typography>
+                  </ListItemButton>
                 </ListItem>
                 {idx < album.tracks.length - 1 && <Divider component="li" />}
               </React.Fragment>

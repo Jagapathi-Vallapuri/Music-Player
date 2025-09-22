@@ -1,5 +1,6 @@
-// Switched provider from Jamendo to Spotify. Contracts remain the same for controllers.
-const { searchTracks, getTrackById, getPopular, getAlbums: fetchAlbums, getTracksByIds: fetchTracksByIdsService, getAlbumById } = require('../services/spotifyService');
+// Using Jamendo as the music provider. Controller contracts remain the same.
+const { searchTracks, getTrackById, getPopular, getAlbums: fetchAlbums, getTracksByIds: fetchTracksByIdsService, getAlbumById } = require('../services/jamendoService');
+const axios = require('axios');
 
 
 const search = async (req, res) => {
@@ -79,6 +80,72 @@ module.exports = {
 	getPopularTracks,
 	getAlbums,
 	getAlbum,
-    getTracksByIds
+		getTracksByIds
+};
+
+// Stream/proxy external audio (e.g., Jamendo) to bypass CORS and support Range requests
+// GET /api/music/stream?src=<encodedUrl>
+module.exports.streamAudio = async (req, res) => {
+	try {
+		const { src } = req.query;
+		if (!src) {
+			return res.status(400).json({ message: 'Missing src parameter' });
+		}
+		let url;
+		try {
+			url = new URL(src);
+		} catch (e) {
+			return res.status(400).json({ message: 'Invalid src URL' });
+		}
+		// Basic SSRF protection: allow only Jamendo storage hosts
+		const hostname = url.hostname.toLowerCase();
+		const allowed = hostname.endsWith('.jamendo.com') || hostname === 'jamendo.com';
+		if (!allowed) {
+			return res.status(400).json({ message: 'Source host not allowed' });
+		}
+
+		const headers = {};
+		if (req.headers.range) headers.Range = req.headers.range;
+		// Some providers require a UA
+		headers['User-Agent'] = req.headers['user-agent'] || 'MusicPlayer/1.0';
+
+		const upstream = await axios.get(url.toString(), {
+			responseType: 'stream',
+			headers,
+			validateStatus: () => true,
+		});
+
+		// Forward key headers for media playback
+		const passthroughHeaders = [
+			'content-type',
+			'content-length',
+			'accept-ranges',
+			'content-range',
+			'cache-control',
+			'etag',
+			'last-modified',
+		];
+		passthroughHeaders.forEach((h) => {
+			const v = upstream.headers[h];
+			if (v) res.setHeader(h, v);
+		});
+		// Make sure range is supported by client
+		if (!upstream.headers['accept-ranges']) res.setHeader('accept-ranges', 'bytes');
+		// Reduce caching risk for signed URLs
+		if (!upstream.headers['cache-control']) res.setHeader('cache-control', 'no-store');
+
+		const status = upstream.status === 206 ? 206 : upstream.status === 200 ? 200 : upstream.status;
+		res.status(status);
+		if (status >= 400) {
+			// Drain error body to text if possible
+			upstream.data.on('data', () => {});
+			upstream.data.on('end', () => res.end());
+		} else {
+			upstream.data.pipe(res);
+		}
+	} catch (err) {
+		console.error('Audio stream proxy error:', err.message);
+		res.status(500).json({ message: 'Failed to stream audio' });
+	}
 };
 
