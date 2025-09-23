@@ -2,8 +2,9 @@ import React from 'react';
 import { Box, Card, CardActionArea, CardContent, CardMedia, IconButton, Typography, Tooltip } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 
-const TrackCard = ({ track, onPlay, onFavorite }) => {
+const TrackCard = ({ track, onPlay, onFavorite, isFavorite = false, onToggleFavorite }) => {
   const cover = track.image || track.cover || track.albumImage || `https://picsum.photos/seed/${encodeURIComponent(track.id)}/300/300`;
   return (
     <Card sx={(theme) => ({ background: theme.palette.gradients.surface })}>
@@ -21,9 +22,9 @@ const TrackCard = ({ track, onPlay, onFavorite }) => {
               <PlayArrowIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Favorite">
-            <IconButton size="small" onClick={() => onFavorite?.(track)}>
-              <FavoriteBorderIcon />
+          <Tooltip title={isFavorite ? 'Unfavorite' : 'Favorite'}>
+            <IconButton size="small" color={isFavorite ? 'error' : 'default'} onClick={() => (onToggleFavorite ? onToggleFavorite(track, !isFavorite) : onFavorite?.(track))}>
+              {isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
             </IconButton>
           </Tooltip>
         </Box>

@@ -148,3 +148,29 @@ export const deleteMySong = async (filename) => {
     const res = await api.delete(`/songs/${encodeURIComponent(filename)}`);
     return res.data;
 };
+
+// Favorites & History API helpers
+export const getFavorites = async () => {
+    const res = await api.get('/users/favorites');
+    return res.data;
+};
+
+export const addFavorite = async (trackId) => {
+    const res = await api.post('/users/favorites', { trackId });
+    return res.data;
+};
+
+export const removeFavorite = async (trackId) => {
+    const res = await api.delete('/users/favorites', { data: { trackId } });
+    return res.data;
+};
+
+export const addHistory = async (trackId) => {
+    const res = await api.post('/users/history', { trackId });
+    return res.data;
+};
+
+export const getHistory = async () => {
+    const res = await api.get('/users/history');
+    return res.data;
+};

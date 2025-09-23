@@ -4,7 +4,10 @@ const User = require('../models/User');
 
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
+  let token = authHeader && authHeader.split(' ')[1];
+  if (!token && req.query && typeof req.query.token === 'string') {
+    token = req.query.token;
+  }
 
   if (!token) return res.status(401).json({ message: 'Access denied. No token.' });
 

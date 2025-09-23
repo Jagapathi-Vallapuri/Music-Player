@@ -17,6 +17,8 @@ const userSchema = new mongoose.Schema({
     profilePictureType: { type: String },
     about: { type: String, maxlength: 500, default: '' },
     avatarFilename: { type: String },
+    avatarMimeType: { type: String },
+    avatarGridfsId: { type: mongoose.Schema.Types.ObjectId },
     uploadedSongs: [{
         filename: { type: String, required: true },
         originalName: { type: String, required: true },
@@ -24,12 +26,10 @@ const userSchema = new mongoose.Schema({
         mimeType: { type: String, required: true },
         uploadDate: { type: Date, default: Date.now },
         gridfsId: { type: mongoose.Schema.Types.ObjectId },
-        // Optional metadata
         title: { type: String },
         coverFilename: { type: String },
         coverMimeType: { type: String },
         coverGridfsId: { type: mongoose.Schema.Types.ObjectId },
-        // Curation metrics
         curationScore: { type: Number, default: 0 },
         curation: {
             hasCover: { type: Boolean, default: false },

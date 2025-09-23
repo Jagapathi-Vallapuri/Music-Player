@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useUI } from './UIContext.jsx';
-import api from '../../client.js';
+import api, { addHistory } from '../../client.js';
 
 const PlayerContext = createContext({
   current: null,
@@ -11,6 +11,7 @@ const PlayerContext = createContext({
   index: -1,
   // playback controls
   playTrack: (track) => {},
+  playClicked: (track) => {},
   playQueue: (tracks, startIndex = 0) => {},
   enqueue: (tracks) => {},
   removeAt: (idx) => {},
@@ -37,8 +38,20 @@ export const PlayerProvider = ({ children }) => {
   const [current, setCurrent] = useState(null); // { id, name/title, artist, audioUrl, image }
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState({ currentTime: 0, duration: 0 });
-  const [queue, setQueue] = useState([]); // normalized tracks
-  const [index, setIndex] = useState(-1);
+  const [queue, setQueue] = useState(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('player.queue') : null;
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }); // normalized tracks
+  const [index, setIndex] = useState(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('player.index') : null;
+      const n = raw != null ? parseInt(raw, 10) : -1;
+      return Number.isFinite(n) ? n : -1;
+    } catch { return -1; }
+  });
   const [volume, setVolumeState] = useState(() => {
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('player.volume') : null;
     const v = saved != null ? parseFloat(saved) : 0.8;
@@ -99,6 +112,25 @@ export const PlayerProvider = ({ children }) => {
     if (typeof localStorage !== 'undefined') localStorage.setItem('player.muted', String(muted));
   }, [muted]);
 
+  // Persist queue and index whenever they change
+  useEffect(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('player.queue', JSON.stringify(queue || []));
+        localStorage.setItem('player.index', String(index));
+      }
+    } catch {}
+  }, [queue, index]);
+
+  // Restore current from queue/index on mount (no autoplay)
+  useEffect(() => {
+    if (index >= 0 && index < queue.length) {
+      setCurrent(queue[index]);
+      setPlaying(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const toPlayableSrc = useCallback((src) => {
     if (!src) return src;
     const base = (api?.defaults?.baseURL || '').replace(/\/+$/, '');
@@ -137,6 +169,13 @@ export const PlayerProvider = ({ children }) => {
       if (audio.src !== tr.audioUrl) audio.src = tr.audioUrl;
       await audio.play();
       setPlaying(true);
+      // best-effort: log to history (non-blocking)
+      try {
+        const tid = tr.id || tr.title || tr.audioUrl;
+        if (tid) {
+          addHistory(String(tid)).catch(() => {});
+        }
+      } catch (_) { /* ignore */ }
     } catch (e) {
       setPlaying(false);
       toastError('Unable to play');
@@ -152,6 +191,39 @@ export const PlayerProvider = ({ children }) => {
     setQueue([normalized]);
     await playAtIndex(0);
   }, [normalizeTrack, playAtIndex, toastError]);
+
+  // If something is playing and user clicks another song, start that song now and push the current one right after it.
+  const playClicked = useCallback(async (track) => {
+    const n = normalizeTrack(track);
+    if (!n.audioUrl) {
+      toastError('No preview available for this track');
+      return;
+    }
+    // If nothing is playing, just play it.
+    if (index === -1 || !queue.length) {
+      setQueue([n]);
+      await playAtIndex(0);
+      return;
+    }
+    // Build new queue: clicked track first, then current, then rest excluding duplicates
+    setQueue((q) => {
+      const cur = (index >= 0 && index < q.length) ? q[index] : null;
+      // Remove any existing occurrence of clicked track and current to avoid duplicates
+      const filtered = q.filter((t, i) => {
+        const sameClicked = (t.id && n.id && t.id === n.id) || t.audioUrl === n.audioUrl;
+        const sameCur = cur && ((t.id && cur.id && t.id === cur.id) || t.audioUrl === cur.audioUrl);
+        return !sameClicked && !(sameCur && i !== index); // keep the current at its index for now
+      });
+      const rest = filtered.slice(index + 1);
+      const before = filtered.slice(0, index);
+      const newQ = [n, ...(cur ? [cur] : []), ...before, ...rest];
+      // Start playing the clicked track at index 0
+      setTimeout(() => playAtIndex(0), 0);
+      // Reset index to 0; playAtIndex will sync state
+      setIndex(0);
+      return newQ;
+    });
+  }, [normalizeTrack, index, queue.length, playAtIndex, toastError]);
 
   const playQueue = useCallback(async (tracks, startIndex = 0) => {
     const arr = Array.isArray(tracks) ? tracks : [tracks];
@@ -343,6 +415,7 @@ export const PlayerProvider = ({ children }) => {
     queue,
     index,
     playTrack,
+    playClicked,
     playQueue,
     enqueue,
   removeAt,

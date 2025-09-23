@@ -58,6 +58,9 @@ app.use('/api/users', userRoutes);
 const songsRoutes = require('./routes/songsRoutes');
 app.use('/api/songs', songsRoutes);
 
+const imagesRoutes = require('./routes/imagesRoutes');
+app.use('/api/images', imagesRoutes);
+
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,

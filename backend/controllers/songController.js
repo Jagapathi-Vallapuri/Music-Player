@@ -1,37 +1,50 @@
 const mongoose = require('mongoose');
-const Grid = require('gridfs-stream');
+const { GridFSBucket, ObjectId } = require('mongodb');
 const conn = mongoose.connection;
-let gfs;
+let bucket;
 
 conn.once('open', () => {
-  gfs = Grid(conn.db, mongoose.mongo);
-  if (!gfs) {
-    console.error('Failed to initialize GridFS');
-    return;
-  }
-  gfs.collection('uploads');
+  bucket = new GridFSBucket(conn.db, { bucketName: 'uploads' });
 });
 
 const User = require('../models/User');
 
 const uploadSong = async (req, res) => {
   try {
-    const songFile = req.files?.song?.[0];
-    const coverFile = req.files?.cover?.[0];
+  const songFile = req.files?.song?.[0];
+  const coverFile = req.files?.cover?.[0];
     const { title } = req.body || {};
     if (!songFile) {
       return res.status(400).json({ message: 'No audio file uploaded' });
     }
 
-    // Basic audio-only validation
     if (!songFile.mimetype || !songFile.mimetype.startsWith('audio/')) {
       return res.status(400).json({ message: 'Uploaded file must be an audio file' });
     }
     if (coverFile && !coverFile.mimetype?.startsWith('image/')) {
       return res.status(400).json({ message: 'Cover must be an image' });
     }
+    const songFilename = `${req.user._id}-${Date.now()}-${songFile.originalname}`;
+    const songUpload = bucket.openUploadStream(songFilename, { contentType: songFile.mimetype });
+    songUpload.end(songFile.buffer);
 
-    // Compute a simple curation score
+    let coverFilename, coverId;
+    if (coverFile) {
+      coverFilename = `${req.user._id}-${Date.now()}-${coverFile.originalname}`;
+      const coverUpload = bucket.openUploadStream(coverFilename, { contentType: coverFile.mimetype });
+      coverUpload.end(coverFile.buffer);
+      // Retrieve ids after finish
+      await new Promise((resolve, reject) => {
+        coverUpload.on('finish', resolve);
+        coverUpload.on('error', reject);
+      });
+      coverId = coverUpload.id;
+    }
+    await new Promise((resolve, reject) => {
+      songUpload.on('finish', resolve);
+      songUpload.on('error', reject);
+    });
+
     const titleLen = typeof title === 'string' ? title.trim().length : 0;
     const hasCover = !!coverFile;
     const preferredAudio = /mp3|mpeg|aac|flac|wav|ogg/.test(songFile.mimetype);
@@ -39,15 +52,15 @@ const uploadSong = async (req, res) => {
     const curationScore = (hasCover ? 40 : 0) + Math.min(30, Math.floor(titleLen / 2)) + (preferredAudio ? 20 : 5) + (sizeQuality === 'ok' ? 10 : sizeQuality === 'large' ? 5 : 0);
 
     const songData = {
-      filename: songFile.filename,
+      filename: songFilename,
       originalName: songFile.originalname,
       size: songFile.size,
       mimeType: songFile.mimetype,
-      gridfsId: songFile.id,
+      gridfsId: songUpload.id,
       title: typeof title === 'string' ? title.trim() : undefined,
-      coverFilename: coverFile?.filename,
+      coverFilename,
       coverMimeType: coverFile?.mimetype,
-      coverGridfsId: coverFile?.id,
+      coverGridfsId: coverId,
       curationScore,
       curation: {
         hasCover,
@@ -93,9 +106,10 @@ const deleteSong = async (req, res) => {
     const song = user.uploadedSongs[songIndex];
 
     if (song.gridfsId) {
-      gfs.remove({ _id: song.gridfsId, root: 'uploads' }, (err) => {
-        if (err) console.error('GridFS delete error:', err);
-      });
+      try { await bucket.delete(new ObjectId(song.gridfsId)); } catch (e) { /* ignore */ }
+    }
+    if (song.coverGridfsId) {
+      try { await bucket.delete(new ObjectId(song.coverGridfsId)); } catch (e) { /* ignore */ }
     }
 
     user.uploadedSongs.splice(songIndex, 1);
@@ -117,23 +131,22 @@ const streamSong = async (req, res) => {
       return res.status(404).json({ message: 'Song not found' });
     }
 
-    const readstream = gfs.createReadStream({
-      _id: song.gridfsId,
-      root: 'uploads'
-    });
-
-    readstream.on('error', (err) => {
-      res.status(500).json({ message: 'Stream error', error: err.message });
-    });
-
-    res.set('Content-Type', song.mimeType);
-    readstream.pipe(res);
+    try {
+      const dl = bucket.openDownloadStream(new ObjectId(song.gridfsId));
+      res.set('Content-Type', song.mimeType);
+      const cleanup = () => { try { dl.unpipe(res); } catch (_) {} try { dl.destroy(); } catch (_) {} try { res.end(); } catch (_) {} };
+      dl.on('error', (err) => { cleanup(); res.status(500).json({ message: 'Stream error', error: err.message }); });
+      res.on('close', cleanup);
+      req.on('aborted', cleanup);
+      dl.pipe(res);
+    } catch (err) {
+      return res.status(500).json({ message: 'Failed to stream song', error: err.message });
+    }
   } catch (err) {
     res.status(500).json({ message: 'Failed to stream song', error: err.message });
   }
 };
 
-// Stream cover image by filename (re-use the same collection)
 const streamCover = async (req, res) => {
   try {
     const { filename } = req.params;
@@ -144,17 +157,17 @@ const streamCover = async (req, res) => {
       return res.status(404).json({ message: 'Cover not found' });
     }
 
-    const readstream = gfs.createReadStream({
-      _id: entry.coverGridfsId,
-      root: 'uploads'
-    });
-
-    readstream.on('error', (err) => {
-      res.status(500).json({ message: 'Stream error', error: err.message });
-    });
-
-    res.set('Content-Type', entry.coverMimeType || 'image/jpeg');
-    readstream.pipe(res);
+    try {
+      const dl = bucket.openDownloadStream(new ObjectId(entry.coverGridfsId));
+      res.set('Content-Type', entry.coverMimeType || 'image/jpeg');
+      const cleanup = () => { try { dl.unpipe(res); } catch (_) {} try { dl.destroy(); } catch (_) {} try { res.end(); } catch (_) {} };
+      dl.on('error', (err) => { cleanup(); res.status(500).json({ message: 'Stream error', error: err.message }); });
+      res.on('close', cleanup);
+      req.on('aborted', cleanup);
+      dl.pipe(res);
+    } catch (err) {
+      return res.status(500).json({ message: 'Failed to stream cover', error: err.message });
+    }
   } catch (err) {
     res.status(500).json({ message: 'Failed to stream cover', error: err.message });
   }

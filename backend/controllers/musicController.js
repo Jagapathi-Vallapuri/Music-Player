@@ -1,6 +1,6 @@
-// Using Jamendo as the music provider. Controller contracts remain the same.
 const { searchTracks, getTrackById, getPopular, getAlbums: fetchAlbums, getTracksByIds: fetchTracksByIdsService, getAlbumById, getAlbumsByCategories } = require('../services/jamendoService');
 const axios = require('axios');
+const { AbortController: NodeAbortController } = require('abort-controller');
 
 
 const search = async (req, res) => {
@@ -58,7 +58,6 @@ const getAlbum = async (req, res) => {
 	}
 };
 
-// GET /api/music/albums/by-categories?cats=rock,pop,jazz&per=5
 const getAlbumsPerCategories = async (req, res) => {
 	try {
 		const cats = req.query.cats || '';
@@ -97,8 +96,7 @@ module.exports = {
     getAlbumsPerCategories
 };
 
-// Stream/proxy external audio (e.g., Jamendo) to bypass CORS and support Range requests
-// GET /api/music/stream?src=<encodedUrl>
+
 module.exports.streamAudio = async (req, res) => {
 	try {
 		const { src } = req.query;
@@ -111,7 +109,6 @@ module.exports.streamAudio = async (req, res) => {
 		} catch (e) {
 			return res.status(400).json({ message: 'Invalid src URL' });
 		}
-		// Basic SSRF protection: allow only Jamendo storage hosts
 		const hostname = url.hostname.toLowerCase();
 		const allowed = hostname.endsWith('.jamendo.com') || hostname === 'jamendo.com';
 		if (!allowed) {
@@ -120,16 +117,24 @@ module.exports.streamAudio = async (req, res) => {
 
 		const headers = {};
 		if (req.headers.range) headers.Range = req.headers.range;
-		// Some providers require a UA
 		headers['User-Agent'] = req.headers['user-agent'] || 'MusicPlayer/1.0';
+
+		const aborter = new NodeAbortController();
+		let clientGone = false;
+		const onClientAbort = () => {
+			clientGone = true;
+			try { aborter.abort(); } catch (_) {}
+		};
+		res.on('close', onClientAbort);
+		req.on('aborted', onClientAbort);
 
 		const upstream = await axios.get(url.toString(), {
 			responseType: 'stream',
 			headers,
 			validateStatus: () => true,
+			signal: aborter.signal,
 		});
 
-		// Forward key headers for media playback
 		const passthroughHeaders = [
 			'content-type',
 			'content-length',
@@ -143,19 +148,23 @@ module.exports.streamAudio = async (req, res) => {
 			const v = upstream.headers[h];
 			if (v) res.setHeader(h, v);
 		});
-		// Make sure range is supported by client
 		if (!upstream.headers['accept-ranges']) res.setHeader('accept-ranges', 'bytes');
-		// Reduce caching risk for signed URLs
 		if (!upstream.headers['cache-control']) res.setHeader('cache-control', 'no-store');
 
 		const status = upstream.status === 206 ? 206 : upstream.status === 200 ? 200 : upstream.status;
 		res.status(status);
 		if (status >= 400) {
-			// Drain error body to text if possible
 			upstream.data.on('data', () => {});
 			upstream.data.on('end', () => res.end());
 		} else {
 			upstream.data.pipe(res);
+			const cleanup = () => {
+				try { upstream.data.unpipe(res); } catch (_) {}
+				try { upstream.data.destroy(); } catch (_) {}
+				try { res.end(); } catch (_) {}
+			};
+			res.on('close', cleanup);
+			req.on('aborted', cleanup);
 		}
 	} catch (err) {
 		console.error('Audio stream proxy error:', err.message);

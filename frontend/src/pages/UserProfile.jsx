@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Avatar, Box, Container, Paper, Stack, Typography, Divider, Button, TextField, CircularProgress, IconButton, Tooltip } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
-import { getMe, updateAbout, uploadAvatar, deleteAvatar } from '../../client.js';
+import api, { getMe, updateAbout, uploadAvatar, deleteAvatar, getFavorites as apiGetFavorites, getHistory as apiGetHistory } from '../../client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PhotoCamera, Edit, Save, Cancel } from '@mui/icons-material';
 import { useUI } from '../context/UIContext.jsx';
 
 const placeholderAbout = `Music enthusiast. Curator of eclectic playlists. Exploring independent artists and immersive soundscapes.`;
 
-const metrics = [
-  { label: 'Playlists', value: 7 },
-  { label: 'Favorites', value: 42 },
-  { label: 'Hours Listened', value: 128 },
-  { label: 'Uploads', value: 3 }
+const defaultMetrics = [
+  { label: 'Playlists', value: 0 },
+  { label: 'Favorites', value: 0 },
+  { label: 'Hours Listened', value: 0 },
+  { label: 'Uploads', value: 0 }
 ];
 
 const UserProfile = () => {
@@ -26,6 +26,7 @@ const UserProfile = () => {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const { toastSuccess, toastError } = useUI();
+  const [metrics, setMetrics] = useState(defaultMetrics);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +36,38 @@ const UserProfile = () => {
         if (!cancelled) {
           setProfile(data);
           setAboutValue(data?.about || '');
+        }
+        // Load metrics in parallel
+        const [plRes, favIds, history, mySongsRes] = await Promise.allSettled([
+          api.get('/users/playlists'),
+          apiGetFavorites(),
+          apiGetHistory(),
+          api.get('/songs'),
+        ]);
+        if (!cancelled) {
+          const playlistsCount = plRes.status === 'fulfilled' ? (Array.isArray(plRes.value.data) ? plRes.value.data.length : 0) : 0;
+          const favoritesCount = favIds.status === 'fulfilled' ? (Array.isArray(favIds.value) ? favIds.value.length : 0) : 0;
+          const uploadsCount = mySongsRes.status === 'fulfilled' ? (Array.isArray(mySongsRes.value.data) ? mySongsRes.value.data.length : 0) : 0;
+          let hours = 0;
+          if (history.status === 'fulfilled') {
+            try {
+              const items = Array.isArray(history.value) ? history.value : [];
+              // Best-effort: resolve durations for recent unique trackIds
+              const ids = Array.from(new Set(items.map(h => h.trackId))).slice(0, 100);
+              if (ids.length) {
+                const tRes = await api.get('/music/tracks', { params: { ids: ids.join(',') } });
+                const byId = new Map((tRes.data || []).map(t => [String(t.id), Number(t.duration) || 0]));
+                const totalSec = items.reduce((acc, it) => acc + (byId.get(String(it.trackId)) || 0), 0);
+                hours = Math.round(totalSec / 3600);
+              }
+            } catch(_) {}
+          }
+          setMetrics([
+            { label: 'Playlists', value: playlistsCount },
+            { label: 'Favorites', value: favoritesCount },
+            { label: 'Hours Listened', value: hours },
+            { label: 'Uploads', value: uploadsCount },
+          ]);
         }
       } catch (err) {
         if (!cancelled) setError(err.message);

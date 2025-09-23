@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Container, Stack, Typography, TextField, InputAdornment, IconButton, Paper, List, ListItem, ListItemAvatar, Avatar, ListItemText, Divider, Button, Skeleton } from '@mui/material';
+import { Container, Stack, Typography, TextField, InputAdornment, IconButton, Paper, List, ListItem, ListItemAvatar, Avatar, ListItemText, Divider, Button, Skeleton, Tooltip } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import api from '../../client.js';
+import api, { getFavorites as apiGetFavorites, addFavorite as apiAddFavorite, removeFavorite as apiRemoveFavorite } from '../../client.js';
 import { usePlayer } from '../context/PlayerContext.jsx';
 import { useUI } from '../context/UIContext.jsx';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 
 function useQuery() {
   const { search } = useLocation();
@@ -17,8 +19,9 @@ const SearchPage = () => {
   const [q, setQ] = useState(initialQ);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
-  const { playQueue, enqueue, playNow } = usePlayer();
+  const { playQueue, enqueue, playNow, playClicked } = usePlayer();
   const { toastError } = useUI();
+  const [favorites, setFavorites] = useState({ loading: true, ids: [] });
 
   const doSearch = async (term, signal) => {
     if (!term?.trim()) { setResults([]); return; }
@@ -44,6 +47,32 @@ const SearchPage = () => {
     return () => ac.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qs]);
+
+  // Load user's favorites once for heart toggles
+  useEffect(() => {
+    (async () => {
+      try {
+        const favIds = await apiGetFavorites();
+        setFavorites({ loading: false, ids: Array.isArray(favIds) ? favIds : [] });
+      } catch (e) {
+        setFavorites({ loading: false, ids: [] });
+      }
+    })();
+  }, []);
+
+  const toggleFavorite = async (track, makeFav) => {
+    const id = String(track?.id ?? '');
+    if (!id) return;
+    try {
+      if (makeFav) await apiAddFavorite(id); else await apiRemoveFavorite(id);
+      setFavorites((s) => ({
+        ...s,
+        ids: makeFav ? Array.from(new Set([...(s.ids || []), id])) : (s.ids || []).filter((x) => x !== id),
+      }));
+    } catch (e) {
+      toastError(e?.response?.data?.message || 'Failed to update favorite');
+    }
+  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -88,10 +117,19 @@ const SearchPage = () => {
               <React.Fragment key={t.id || idx}>
                 <ListItem
                   disablePadding
-                  secondaryAction={<Button size="small" onClick={() => enqueue([t])}>Add</Button>}
+                  secondaryAction={
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Tooltip title={(favorites.ids || []).includes(String(t.id)) ? 'Unfavorite' : 'Favorite'}>
+                        <IconButton size="small" color={(favorites.ids || []).includes(String(t.id)) ? 'error' : 'default'} onClick={() => toggleFavorite(t, !(favorites.ids || []).includes(String(t.id)))}>
+                          {(favorites.ids || []).includes(String(t.id)) ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+                        </IconButton>
+                      </Tooltip>
+                      <Button size="small" onClick={() => enqueue([t])}>Add</Button>
+                    </Stack>
+                  }
                 >
                   <ListItemAvatar><Avatar variant="rounded" src={t.image} alt={t.name} /></ListItemAvatar>
-                  <ListItemText primary={t.name} secondary={t.artist} onClick={() => playQueue(results, idx)} />
+                  <ListItemText primary={t.name} secondary={t.artist} onClick={() => playClicked(t)} />
                 </ListItem>
                 {idx < results.length - 1 && <Divider component="li" />}
               </React.Fragment>

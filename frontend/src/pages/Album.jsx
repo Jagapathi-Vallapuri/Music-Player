@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { Box, Container, Typography, Stack, Paper, Avatar, Skeleton, Button, Divider, List, ListItem, ListItemAvatar, ListItemText, ListItemButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
-import api from '../../client.js';
+import { Box, Container, Typography, Stack, Paper, Avatar, Skeleton, Button, Divider, List, ListItem, ListItemAvatar, ListItemText, ListItemButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, InputLabel, FormControl, Tooltip, IconButton } from '@mui/material';
+import api, { getFavorites as apiGetFavorites, addFavorite as apiAddFavorite, removeFavorite as apiRemoveFavorite } from '../../client.js';
 import { usePlayer } from '../context/PlayerContext.jsx';
 import { useUI } from '../context/UIContext.jsx';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import QueueMusicIcon from '@mui/icons-material/QueueMusic';
 
 const AlbumPage = () => {
   const { id } = useParams();
@@ -15,6 +20,7 @@ const AlbumPage = () => {
   const [selectedId, setSelectedId] = useState('');
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [favorites, setFavorites] = useState({ loading: true, ids: [] });
 
   useEffect(() => {
     const ac = new AbortController();
@@ -33,6 +39,32 @@ const AlbumPage = () => {
     })();
     return () => ac.abort();
   }, [id, toastError]);
+
+  // Load user's favorite track IDs
+  useEffect(() => {
+    (async () => {
+      try {
+        const favIds = await apiGetFavorites();
+        setFavorites({ loading: false, ids: Array.isArray(favIds) ? favIds : [] });
+      } catch (e) {
+        setFavorites({ loading: false, ids: [] });
+      }
+    })();
+  }, []);
+
+  const toggleFavorite = async (track, makeFav) => {
+    const id = String(track?.id ?? '');
+    if (!id) return;
+    try {
+      if (makeFav) await apiAddFavorite(id); else await apiRemoveFavorite(id);
+      setFavorites((s) => ({
+        ...s,
+        ids: makeFav ? Array.from(new Set([...(s.ids || []), id])) : (s.ids || []).filter((x) => x !== id),
+      }));
+    } catch (e) {
+      toastError(e?.response?.data?.message || 'Failed to update favorite');
+    }
+  };
 
   const openAddDialog = async (mode, track = null) => {
     setDlg({ open: true, mode, track });
@@ -98,10 +130,22 @@ const AlbumPage = () => {
       </Box>
       <Box sx={{ flex: 1 }} />
       {!state.loading && album?.tracks?.length ? (
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-          <Button variant="contained" onClick={() => playNow(album.tracks)}>Play now</Button>
-          <Button variant="outlined" onClick={() => enqueue(album.tracks)}>Add to queue</Button>
-          <Button variant="outlined" onClick={() => openAddDialog('album')}>Add album to playlist</Button>
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Play now">
+            <IconButton color="primary" onClick={() => playNow(album.tracks)}>
+              <PlayArrowIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Add to queue">
+            <IconButton onClick={() => enqueue(album.tracks)}>
+              <QueueMusicIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Add album to playlist">
+            <IconButton onClick={() => openAddDialog('album')}>
+              <PlaylistAddIcon />
+            </IconButton>
+          </Tooltip>
         </Stack>
       ) : null}
       <Button component={RouterLink} to="/albums" variant="outlined">Back to albums</Button>
@@ -128,18 +172,37 @@ const AlbumPage = () => {
                 <ListItem
                   disablePadding
                   secondaryAction={
-                    <Button size="small" onClick={() => openAddDialog('track', t)}>Add to playlist</Button>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { xs: 'flex-end', sm: 'center' } }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 44, textAlign: 'right' }}>
+                        {formatDuration(t.duration)}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', justifyContent: 'flex-end' }}>
+                        <Tooltip title={(favorites.ids || []).includes(String(t.id)) ? 'Unfavorite' : 'Favorite'}>
+                          <IconButton
+                            size="small"
+                            color={(favorites.ids || []).includes(String(t.id)) ? 'error' : 'default'}
+                            onClick={() => toggleFavorite(t, !(favorites.ids || []).includes(String(t.id)))}
+                          >
+                            {(favorites.ids || []).includes(String(t.id)) ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Add to playlist">
+                          <IconButton size="small" onClick={() => openAddDialog('track', t)}>
+                            <PlaylistAddIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </Stack>
                   }
                 >
                   <ListItemButton onClick={() => playQueue(album.tracks, idx)}>
-                  <ListItemAvatar>
-                    <Avatar variant="rounded" src={t.image} alt={t.name} />
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={t.name}
-                    secondary={t.artist}
-                  />
-                  <Typography variant="body2" color="text.secondary">{formatDuration(t.duration)}</Typography>
+                    <ListItemAvatar>
+                      <Avatar variant="rounded" src={t.image} alt={t.name} />
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={t.name}
+                      secondary={t.artist}
+                    />
                   </ListItemButton>
                 </ListItem>
                 {idx < album.tracks.length - 1 && <Divider component="li" />}

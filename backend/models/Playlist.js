@@ -4,10 +4,12 @@ const playlistSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true },
   tracks: [String],
-  // Optional cover image URL for the playlist
   coverUrl: { type: String },
-  // Optional description
-  description: { type: String },
+  // GridFS-backed cover image (optional)
+  coverFilename: { type: String },
+  coverMimeType: { type: String },
+  coverGridfsId: { type: mongoose.Schema.Types.ObjectId },
+  description: { type: String, default: 'A handpicked selection of tracks.' },
   createdAt: { type: Date, default: Date.now }
 }, { collection: 'playlists' });
 

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Container, Typography, Box, Button, Stack, Paper, Skeleton } from '@mui/material';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Container, Typography, Box, Button, Stack, Paper, Skeleton, Avatar } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import Carousel from '../components/Carousel.jsx';
@@ -7,16 +7,18 @@ import TrackCard from '../components/cards/TrackCard.jsx';
 import { usePlayer } from '../context/PlayerContext.jsx';
 import AlbumCard from '../components/cards/AlbumCard.jsx';
 import PlaylistCard from '../components/cards/PlaylistCard.jsx';
-import api from '../../client.js';
+import api, { getFavorites as apiGetFavorites, addFavorite as apiAddFavorite, removeFavorite as apiRemoveFavorite, getHistory as apiGetHistory } from '../../client.js';
 import { useUI } from '../context/UIContext.jsx';
 
 const Home = () => {
     const { toastError } = useUI();
-    const { playTrack } = usePlayer();
+    const { playClicked, togglePlay, playing, current, queue, index } = usePlayer();
     const navigate = useNavigate();
     const [popular, setPopular] = useState({ loading: true, data: [] });
     const [albums, setAlbums] = useState({ loading: true, data: [] });
     const [playlists, setPlaylists] = useState({ loading: true, data: [] });
+    const [favorites, setFavorites] = useState({ loading: true, ids: [] });
+    const [history, setHistory] = useState({ loading: true, items: [] });
 
     useEffect(() => {
         const ac = new AbortController();
@@ -59,18 +61,62 @@ const Home = () => {
             }
 
             try {
-                const pl = await api.get('/users/playlists', { signal: ac.signal });
-                setPlaylists({ loading: false, data: Array.isArray(pl.data) ? pl.data : [] });
-            } catch (err) {
-                setPlaylists(s => ({ ...s, loading: false }));
-            }
+                const [plRes, favRes, histRes] = await Promise.allSettled([
+                    api.get('/users/playlists', { signal: ac.signal }),
+                    apiGetFavorites(),
+                    apiGetHistory(),
+                ]);
+                if (plRes.status === 'fulfilled') {
+                    const pl = plRes.value;
+                    setPlaylists({ loading: false, data: Array.isArray(pl.data) ? pl.data : [] });
+                } else {
+                    setPlaylists(s => ({ ...s, loading: false }));
+                }
+                if (favRes.status === 'fulfilled') {
+                    setFavorites({ loading: false, ids: Array.isArray(favRes.value) ? favRes.value : [] });
+                } else {
+                    setFavorites({ loading: false, ids: [] });
+                }
+                if (histRes.status === 'fulfilled') {
+                    const items = Array.isArray(histRes.value) ? histRes.value : [];
+                    setHistory({ loading: false, items });
+                } else {
+                    setHistory({ loading: false, items: [] });
+                }
+            } catch (_) {}
         };
         fetchAll();
         return () => ac.abort();
     }, [toastError]);
+
+    const toggleFavorite = async (track, makeFav) => {
+        const id = track.id || track.track_id || track.title;
+        if (!id) return;
+        try {
+            if (makeFav) await apiAddFavorite(id); else await apiRemoveFavorite(id);
+            setFavorites((s) => ({ ...s, ids: makeFav ? Array.from(new Set([...(s.ids||[]), id])) : (s.ids||[]).filter(x => x !== id) }));
+        } catch (e) {
+            toastError(e?.response?.data?.message || 'Failed to update favorite');
+        }
+    };
+    const hasSomething = useMemo(() => (Array.isArray(queue) && queue.length > 0) || !!current, [queue, current]);
+    const resumeLabel = playing ? 'Pause' : (index >= 0 ? 'Resume' : 'Start');
+
     return (
         <>
             <Container maxWidth="lg" sx={{ pt: 6, pb: 8 }}>
+                {/* Resume Listening Shelf */}
+                {hasSomething && (
+                    <Paper sx={{ p: 2, mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar variant="rounded" src={current?.image} alt={current?.title} sx={{ width: 56, height: 56 }} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="subtitle2" color="text.secondary">Resume listening</Typography>
+                            <Typography variant="h6" noWrap>{current?.title || (queue[index]?.title) || 'Your queue'}</Typography>
+                            {current?.artist && <Typography variant="body2" color="text.secondary" noWrap>{current.artist}</Typography>}
+                        </Box>
+                        <Button variant="contained" onClick={togglePlay}>{resumeLabel}</Button>
+                    </Paper>
+                )}
                 {/* Popular Section */}
                 <Stack spacing={2} sx={{ mb: 4 }}>
                     <Stack direction="row" alignItems="baseline" justifyContent="space-between">
@@ -95,11 +141,45 @@ const Home = () => {
                                                 <TrackCard
                                                     key={track.id}
                                                     track={track}
-                                                    onPlay={() => playTrack(track)}
+                                                    onPlay={() => playClicked(track)}
+                                                    isFavorite={favorites.ids.includes(track.id)}
+                                                    onToggleFavorite={(tr, makeFav) => toggleFavorite(tr, makeFav)}
                                                 />
                                             );
                                         })}
                                     </Carousel>
+                    )}
+                </Stack>
+
+                {/* Favorites Section */}
+                <Stack spacing={2} sx={{ mb: 4 }}>
+                    <Stack direction="row" alignItems="baseline" justifyContent="space-between">
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>Your Favorites</Typography>
+                    </Stack>
+                    {favorites.loading ? (
+                        <Stack direction="row" spacing={1}>{[...Array(5)].map((_, i) => (<Skeleton key={i} variant="rectangular" width={200} height={220} />))}</Stack>
+                    ) : favorites.ids.length === 0 ? (
+                        <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
+                            <Typography>No favorites yet. Tap the heart to save tracks.</Typography>
+                        </Paper>
+                    ) : (
+                        <FavoritesCarousel favoriteIds={favorites.ids} onPlay={playClicked} onToggleFavorite={toggleFavorite} />
+                    )}
+                </Stack>
+
+                {/* Recently Played Section */}
+                <Stack spacing={2} sx={{ mb: 4 }}>
+                    <Stack direction="row" alignItems="baseline" justifyContent="space-between">
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>Recently Played</Typography>
+                    </Stack>
+                    {history.loading ? (
+                        <Stack direction="row" spacing={1}>{[...Array(5)].map((_, i) => (<Skeleton key={i} variant="rectangular" width={200} height={220} />))}</Stack>
+                    ) : history.items.length === 0 ? (
+                        <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
+                            <Typography>Nothing here yet. Start listening!</Typography>
+                        </Paper>
+                    ) : (
+                        <HistoryCarousel historyItems={history.items} onPlay={playClicked} favoriteIds={favorites.ids} onToggleFavorite={toggleFavorite} />
                     )}
                 </Stack>
 
@@ -143,7 +223,7 @@ const Home = () => {
                     ) : (
                         <Carousel ariaLabel="user-playlists">
                             {playlists.data.map((pl) => (
-                                <PlaylistCard key={pl._id} playlist={pl} />
+                                <PlaylistCard key={pl._id} playlist={pl} onOpen={(p) => navigate(`/playlists/${encodeURIComponent(p._id)}`)} />
                             ))}
                         </Carousel>
                     )}
@@ -154,3 +234,97 @@ const Home = () => {
 };
 
 export default Home;
+
+// --- Helper components to render favorites & history ---
+import PropTypes from 'prop-types';
+
+const useTracksByIds = (ids) => {
+    const [state, setState] = useState({ loading: true, tracks: [] });
+    useEffect(() => {
+        let ignore = false;
+        const load = async () => {
+            if (!ids || ids.length === 0) { setState({ loading: false, tracks: [] }); return; }
+            try {
+                const res = await api.get('/music/tracks', { params: { ids: ids.join(',') } });
+                if (!ignore) setState({ loading: false, tracks: Array.isArray(res.data) ? res.data : [] });
+            } catch (_) {
+                if (!ignore) setState({ loading: false, tracks: [] });
+            }
+        };
+        load();
+        return () => { ignore = true; };
+    }, [ids]);
+    return state;
+};
+
+const FavoritesCarousel = ({ favoriteIds, onPlay, onToggleFavorite }) => {
+    const { loading, tracks } = useTracksByIds(favoriteIds);
+    if (loading) {
+        return <Stack direction="row" spacing={1}>{[...Array(5)].map((_, i) => (<Skeleton key={i} variant="rectangular" width={200} height={220} />))}</Stack>;
+    }
+    return (
+        <Carousel ariaLabel="favorites-tracks">
+            {tracks.map((t) => {
+                const track = {
+                    id: t.id || t.track_id || t.title,
+                    title: t.title || t.name,
+                    artist: t.artist_name || t.artist,
+                    image: t.image,
+                    audioUrl: t.audioUrl || t.audio || t.preview_url,
+                };
+                return (
+                    <TrackCard
+                        key={track.id}
+                        track={track}
+                        onPlay={() => onPlay(track)}
+                        isFavorite
+                        onToggleFavorite={(tr, makeFav) => onToggleFavorite(tr, makeFav)}
+                    />
+                );
+            })}
+        </Carousel>
+    );
+};
+
+FavoritesCarousel.propTypes = {
+    favoriteIds: PropTypes.array.isRequired,
+    onPlay: PropTypes.func.isRequired,
+    onToggleFavorite: PropTypes.func.isRequired,
+};
+
+const HistoryCarousel = ({ historyItems, onPlay, favoriteIds, onToggleFavorite }) => {
+    const ids = useMemo(() => Array.from(new Set((historyItems || []).map((h) => h.trackId))).slice(0, 20), [historyItems]);
+    const { loading, tracks } = useTracksByIds(ids);
+    if (loading) {
+        return <Stack direction="row" spacing={1}>{[...Array(5)].map((_, i) => (<Skeleton key={i} variant="rectangular" width={200} height={220} />))}</Stack>;
+    }
+    return (
+        <Carousel ariaLabel="recently-played">
+            {tracks.map((t) => {
+                const track = {
+                    id: t.id || t.track_id || t.title,
+                    title: t.title || t.name,
+                    artist: t.artist_name || t.artist,
+                    image: t.image,
+                    audioUrl: t.audioUrl || t.audio || t.preview_url,
+                };
+                return (
+                    <TrackCard
+                        key={track.id}
+                        track={track}
+                        onPlay={() => onPlay(track)}
+                        isFavorite={favoriteIds.includes(track.id)}
+                        onToggleFavorite={(tr, makeFav) => onToggleFavorite(tr, makeFav)}
+                    />
+                );
+            })}
+        </Carousel>
+    );
+};
+
+HistoryCarousel.propTypes = {
+    historyItems: PropTypes.array.isRequired,
+    onPlay: PropTypes.func.isRequired,
+    favoriteIds: PropTypes.array.isRequired,
+    onToggleFavorite: PropTypes.func.isRequired,
+};
