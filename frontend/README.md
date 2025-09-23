@@ -1,6 +1,6 @@
-# Music-Player — Frontend
+# Pulse — Frontend
 
-React + Vite + MUI single‑page application for the Music-Player project. Authenticated users get a global PlayerBar with queue management and Jamendo‑powered discovery pages.
+React + Vite + MUI single‑page application for the Pulse project. Authenticated users get a global PlayerBar with queue management and Jamendo‑powered discovery pages.
 
 ## Features
 - Authentication UI: Login, Register, and two‑factor verification

@@ -1,4 +1,4 @@
-# Music-Player
+# Pulse
 
 A full‑stack music app with Jamendo‑powered discovery, user authentication, playlists, personal song uploads/streaming, and a robust global web audio player with queue management.
 
@@ -12,6 +12,9 @@ A full‑stack music app with Jamendo‑powered discovery, user authentication, 
 - Discover: Popular tracks, Albums, Album details (tracks)
 - Personal song upload to MongoDB GridFS and authenticated streaming
 - Rate limiting, request validation, centralized error handling
+- Favorites across the app: like/unlike songs in Album, Playlist, Search results, and Uploads
+- Icon‑first actions: Play Now, Add to Queue, and Add to Playlist presented as icons with tooltips
+- Profile metrics include approximate "hours listened" derived from history
 - Global audio player with:
   - Play/pause, next/prev, seek
   - Volume control and mute, persisted volume
@@ -22,6 +25,7 @@ A full‑stack music app with Jamendo‑powered discovery, user authentication, 
   - Player is shown only when the user is authenticated
   - Album page: “Play now” and “Add to queue” buttons; track row click starts playback from that track
   - Home Popular: clicking a card plays just that single track
+  - Queue and current index persist in localStorage; session resumes after reload without auto‑play
 
 ## Monorepo Structure
 ```
@@ -32,7 +36,7 @@ backend/
   middleware/   # auth, validation, rate-limit, error
   models/       # User, Playlist
   routes/       # /api/* routers
-  services/     # spotify, cache (redis), email
+  services/     # jamendo, cache (redis), email
   uploads/      # gridfs bucket name reference
 frontend/
   src/
@@ -129,7 +133,7 @@ Music (Jamendo-powered, public)
 - GET `/music/popular`
 - GET `/music/albums`
 - GET `/music/albums/:id`
- - GET `/music/stream?src=<jamendo-audio-url>` — streams/proxies Jamendo audio with Range support (used by the frontend player to avoid CORS)
+- GET `/music/stream?src=<jamendo-audio-url>` — streams/proxies Jamendo audio with Range support (used by the frontend player to avoid CORS)
 
 Users (Bearer token required)
 - Profile
@@ -139,7 +143,7 @@ Users (Bearer token required)
   - GET `/users/me/avatar`
   - DELETE `/users/me/avatar`
 - History
-  - POST `/users/history` { track fields }
+  - POST `/users/history` { trackId }
   - GET `/users/history`
 - Favorites
   - GET `/users/favorites`
@@ -150,12 +154,20 @@ Users (Bearer token required)
   - POST `/users/playlists` { name, description?, tracks? }
   - PUT `/users/playlists/:id`
   - DELETE `/users/playlists/:id`
+  - POST `/users/playlists/:id/cover` (multipart form-data, field: `cover`)
 
 Songs (personal uploads; Bearer token required)
 - POST `/songs/upload` (multipart form-data, field: `song`) → Stores into GridFS
 - GET `/songs` → Lists uploaded files
 - GET `/songs/stream/:filename` → Streams from GridFS
+- GET `/songs/cover/:filename` → Streams uploaded cover image from GridFS
 - DELETE `/songs/:filename`
+  
+Images
+- GET `/images/playlist/:id` → Streams playlist cover from GridFS
+  
+Legacy static files (old uploads)
+- Served under `/api/uploads/*` for backward compatibility
 
 Rate Limits
 - General: 100 req / 15 min per IP

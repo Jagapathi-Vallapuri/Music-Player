@@ -1,6 +1,6 @@
-# Music-Player — Backend
+# Pulse — Backend
 
-This folder contains the backend REST API for the Music-Player application (Express + MongoDB + Redis). This README is a concise developer guide to get the backend running locally, explains the 2FA session flow, and documents the Jamendo integration and audio streaming proxy.
+This folder contains the backend REST API for the Pulse application (Express + MongoDB + GridFS + Redis). This README is a concise developer guide to get the backend running locally, explains the 2FA session flow, documents media storage (avatars, playlist covers) in GridFS, and the Jamendo integration with an audio streaming proxy.
 
 ## Quick start
 
@@ -51,17 +51,28 @@ Notes:
 
 Use `POST /api/auth/register` and `POST /api/auth/login` to exercise authentication flows.
 
-## Docker (local / CI)
+## Media storage (GridFS)
 
-A `Dockerfile` exists in this folder. To build and run locally:
+Images (user avatars and playlist covers) and uploaded songs are stored in MongoDB using GridFS under the shared bucket name `uploads`.
 
-```powershell
-cd backend
-docker build -t pulse-backend:local .
-docker run -p 5000:5000 --env-file .env pulse-backend:local
-```
+- Avatars
+	- Upload: `POST /api/users/me/avatar` (multipart form-data, field: `avatar`)
+	- Stream current: `GET /api/users/me/avatar` (auth required) — streams from GridFS
+	- Delete: `DELETE /api/users/me/avatar`
+	- On upload or delete, legacy on-disk files are cleaned up if referenced
 
-When deploying to a container platform, ensure your environment variables (esp. `MONGO_URL`, `REDIS_URL`, and `JWT_SECRET`) are set securely in the target environment.
+- Playlist covers
+	- Upload: `POST /api/users/playlists/:id/cover` (multipart form-data, field: `cover`)
+	- Stream public: `GET /api/images/playlist/:id`
+	- Old GridFS file and any legacy on-disk file are removed on update
+
+- Personal songs
+	- Upload: `POST /api/songs/upload` (multipart; fields: `song`, optional `cover`)
+	- Stream audio: `GET /api/songs/stream/:filename`
+	- Stream cover: `GET /api/songs/cover/:filename`
+	- Delete: `DELETE /api/songs/:filename`
+
+All streaming endpoints support proper cleanup on client disconnect to avoid resource leaks.
 
 ## 2FA model (registration + password change)
 
@@ -103,9 +114,21 @@ Key folders and files:
 Base path: `/api`
 
 - Auth: `POST /auth/register`, `POST /auth/login`, `POST /auth/verify-2fa`, `POST /auth/change-password`
-- Music: `GET /music/search`, `GET /music/track/:id`, `GET /music/popular`, `GET /music/albums`, `GET /music/albums/:id`, `GET /music/stream?src=<jamendo-audio-url>` (audio proxy with Range support)
-- Users / Playlists / Favorites endpoints under `/users`
-- Songs: upload/stream endpoints under `/songs`
+- Music
+	- `GET /music/search`
+	- `GET /music/track/:id`
+	- `GET /music/popular`
+	- `GET /music/albums`
+	- `GET /music/albums/:id`
+	- `GET /music/stream?src=<jamendo-audio-url>` — audio proxy with Range support and upstream abort on disconnect
+
+- Users
+	- Profile: `GET /users/me`, `PATCH /users/me` (about), `POST /users/me/avatar`, `GET /users/me/avatar`, `DELETE /users/me/avatar`
+	- Favorites: `GET /users/favorites`, `POST /users/favorites` { trackId }, `DELETE /users/favorites` { trackId }
+	- History: `POST /users/history` { trackId }, `GET /users/history`
+	- Playlists: `GET /users/playlists`, `POST /users/playlists`, `GET /users/playlists/:id`, `PUT /users/playlists/:id`, `DELETE /users/playlists/:id`, `POST /users/playlists/:id/cover`
+
+- Songs (personal uploads): `POST /songs/upload`, `GET /songs`, `GET /songs/stream/:filename`, `GET /songs/cover/:filename`, `DELETE /songs/:filename`
 
 For full details of each route and payloads, inspect the `routes/` and `controllers/` files.
 
@@ -114,6 +137,7 @@ For full details of each route and payloads, inspect the `routes/` and `controll
 - Redis is used for caching and 2FA sessions; if Redis becomes unavailable the app falls back to a no-op cache for non-critical features, but authentication will fail if 2FA storage is unavailable.
 - Keep `JWT_SECRET` strong and rotate it periodically if feasible.
 - Do not commit `.env` to source control. Use a secrets manager for production deployments.
+- Streaming stability: The audio proxy and GridFS streaming endpoints register `close`/`aborted`/`error` handlers to unpipe and destroy streams promptly when the client disconnects, and cancel upstream requests where applicable. This prevents file descriptor and memory leaks during partial downloads.
 
 ## Troubleshooting
 
@@ -134,5 +158,5 @@ JAMENDO_CLIENT_ID=<your-jamendo-client-id>
 Notes:
 - You can create a Jamendo app to obtain a Client ID at https://devportal.jamendo.com/
 - Endpoints used: `/tracks`, `/albums/tracks` with parameters for popularity ordering, `include=musicinfo`, and `audioformat=mp3` to ensure audio URLs are present.
-- Audio playback is proxied by `GET /api/music/stream?src=<jamendo-audio-url>` to avoid CORS issues and support HTTP Range requests. The proxy whitelists Jamendo storage hosts to mitigate SSRF risks and forwards relevant headers (e.g., Range, Content-Type, Content-Length).
+- Audio playback is proxied by `GET /api/music/stream?src=<jamendo-audio-url>` to avoid CORS issues and support HTTP Range requests. The proxy whitelists Jamendo storage hosts to mitigate SSRF risks and forwards relevant headers (e.g., Range, Content-Type, Content-Length). Upstream requests are aborted if the client disconnects.
 - Respect Jamendo’s licensing and usage policies; track audio is distributed under various Creative Commons licenses. Ensure your use complies with the specific license for each track.
