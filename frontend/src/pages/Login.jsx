@@ -51,49 +51,49 @@ const Login = () => {
                     justifyContent: 'center',
                     py: 6
                 }}>
-                                        <Paper
-                                                elevation={0}
-                                                sx={(theme) => ({
-                                                        p: 5,
-                                                        width: '100%',
-                                                        maxWidth: 520,
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        alignItems: 'stretch',
-                                                        gap: 2,
-                                                        background: theme.palette.gradients.surface,
-                                                        backdropFilter: 'blur(14px)',
-                                                        borderRadius: 4,
-                                                        boxShadow: theme.palette.mode === 'light'
-                                                            ? '0 6px 24px rgba(0,0,0,0.08)'
-                                                            : '0 8px 40px rgba(0,0,0,0.65)',
-                                                        position: 'relative'
-                                                })}
-                                        >
-                    <Typography component="h1" variant="h4" gutterBottom sx={{ textAlign: 'center' }}>
-                        Welcome Back
-                    </Typography>
+                    <Paper
+                        elevation={0}
+                        sx={(theme) => ({
+                            p: 5,
+                            width: '100%',
+                            maxWidth: 520,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'stretch',
+                            gap: 2,
+                            background: theme.palette.gradients.surface,
+                            backdropFilter: 'blur(14px)',
+                            borderRadius: 4,
+                            boxShadow: theme.palette.mode === 'light'
+                                ? '0 6px 24px rgba(0,0,0,0.08)'
+                                : '0 8px 40px rgba(0,0,0,0.65)',
+                            position: 'relative'
+                        })}
+                    >
+                        <Typography component="h1" variant="h4" gutterBottom sx={{ textAlign: 'center' }}>
+                            Welcome Back
+                        </Typography>
 
-                    {msg && (
-                        <Alert
-                            severity={msg === 'Code resent' ? 'success' : 'error'}
-                            sx={{ width: '100%', mb: 2 }}
-                        >
-                            {msg}
-                        </Alert>
-                    )}
+                        {msg && (
+                            <Alert
+                                severity={msg === 'Code resent' ? 'success' : 'error'}
+                                sx={{ width: '100%', mb: 2 }}
+                            >
+                                {msg}
+                            </Alert>
+                        )}
 
-                    <LoginForm onSubmit={handleLogin} loading={loading} initialEmail={email} />
+                        <LoginForm onSubmit={handleLogin} loading={loading} initialEmail={email} />
 
-                    <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
-                        Don't have an account?{' '}
-                        <Link component={RouterLink} to="/register" variant="subtitle2" underline="hover" sx={{ fontWeight: 600 }}>
-                            Create one
-                        </Link>
-                    </Typography>
-                </Paper>
-            </Box>
-        </Container>
+                        <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
+                            Don't have an account?{' '}
+                            <Link component={RouterLink} to="/register" variant="subtitle2" underline="hover" sx={{ fontWeight: 600 }}>
+                                Create one
+                            </Link>
+                        </Typography>
+                    </Paper>
+                </Box>
+            </Container>
         </>
     );
 }

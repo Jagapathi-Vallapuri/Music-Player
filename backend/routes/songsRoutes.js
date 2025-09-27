@@ -4,7 +4,7 @@ const { uploadSong, getUserSongs, deleteSong, streamSong, streamCover } = requir
 const verifyToken = require('../middleware/authMiddleware');
 const multer = require('multer');
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } }); // 200MB limit
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 router.post('/upload', verifyToken, upload.fields([{ name: 'song', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), uploadSong);
 router.get('/', verifyToken, getUserSongs);

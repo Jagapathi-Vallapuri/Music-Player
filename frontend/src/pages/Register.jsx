@@ -182,25 +182,25 @@ const Register = () => {
                     py: 6
                 }}
             >
-                                <Paper
-                                        elevation={0}
-                                        sx={(theme) => ({
-                                                p: 5,
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'stretch',
-                                                width: '100%',
-                                                maxWidth: 520,
-                                                gap: 2,
-                                                background: theme.palette.gradients.surface,
-                                                backdropFilter: 'blur(14px)',
-                                                borderRadius: 4,
-                                                boxShadow: theme.palette.mode === 'light'
-                                                    ? '0 6px 24px rgba(0,0,0,0.08)'
-                                                    : '0 8px 40px rgba(0,0,0,0.65)',
-                                                position: 'relative'
-                                        })}
-                                >
+                <Paper
+                    elevation={0}
+                    sx={(theme) => ({
+                        p: 5,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        width: '100%',
+                        maxWidth: 520,
+                        gap: 2,
+                        background: theme.palette.gradients.surface,
+                        backdropFilter: 'blur(14px)',
+                        borderRadius: 4,
+                        boxShadow: theme.palette.mode === 'light'
+                            ? '0 6px 24px rgba(0,0,0,0.08)'
+                            : '0 8px 40px rgba(0,0,0,0.65)',
+                        position: 'relative'
+                    })}
+                >
                     <Typography component="h1" variant="h4" gutterBottom sx={{ textAlign: 'center' }}>
                         {mode === 'form' ? 'Create your account' : 'Verify your email'}
                     </Typography>
@@ -215,109 +215,109 @@ const Register = () => {
                     )}
 
                     {mode === 'form' && (
-                    <Box component="form" onSubmit={handleRegister} sx={{ mt: 1, width: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            id="username"
-                            label="Username"
-                            name="username"
-                            autoComplete="username"
-                            autoFocus
-                            value={formData.username}
-                            onChange={handleChange}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <Person />
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            id="email"
-                            label="Email Address"
-                            name="email"
-                            autoComplete="email"
-                            type="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <Email />
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            name="password"
-                            label="Password"
-                            type={showPassword ? 'text' : 'password'}
-                            id="password"
-                            autoComplete="new-password"
-                            value={formData.password}
-                            onChange={handleChange}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <Lock />
-                                    </InputAdornment>
-                                ),
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton
-                                            aria-label="toggle password visibility"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            edge="end"
-                                        >
-                                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            name="confirmPassword"
-                            label="Confirm Password"
-                            type={showConfirmPassword ? 'text' : 'password'}
-                            id="confirmPassword"
-                            autoComplete="new-password"
-                            value={formData.confirmPassword}
-                            onChange={handleChange}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <Lock />
-                                    </InputAdornment>
-                                ),
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton
-                                            aria-label="toggle confirm password visibility"
-                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            edge="end"
-                                        >
-                                            {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <Button type="submit" fullWidth variant="contained" size="large" sx={{ mt: 2 }} disabled={loading} startIcon={loading ? <CircularProgress size={16} color="inherit" /> : null}>
-                            {loading ? 'Creating Account...' : 'Create Account'}
-                        </Button>
-                    </Box>
+                        <Box component="form" onSubmit={handleRegister} sx={{ mt: 1, width: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                id="username"
+                                label="Username"
+                                name="username"
+                                autoComplete="username"
+                                autoFocus
+                                value={formData.username}
+                                onChange={handleChange}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Person />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                id="email"
+                                label="Email Address"
+                                name="email"
+                                autoComplete="email"
+                                type="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Email />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                name="password"
+                                label="Password"
+                                type={showPassword ? 'text' : 'password'}
+                                id="password"
+                                autoComplete="new-password"
+                                value={formData.password}
+                                onChange={handleChange}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Lock />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                aria-label="toggle password visibility"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                edge="end"
+                                            >
+                                                {showPassword ? <VisibilityOff /> : <Visibility />}
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                name="confirmPassword"
+                                label="Confirm Password"
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                id="confirmPassword"
+                                autoComplete="new-password"
+                                value={formData.confirmPassword}
+                                onChange={handleChange}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Lock />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                aria-label="toggle confirm password visibility"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                edge="end"
+                                            >
+                                                {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <Button type="submit" fullWidth variant="contained" size="large" sx={{ mt: 2 }} disabled={loading} startIcon={loading ? <CircularProgress size={16} color="inherit" /> : null}>
+                                {loading ? 'Creating Account...' : 'Create Account'}
+                            </Button>
+                        </Box>
                     )}
                     {mode === 'verify' && (
                         <TwoFactorForm

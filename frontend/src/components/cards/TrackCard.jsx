@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Card, CardActionArea, CardContent, CardMedia, IconButton, Typography, Tooltip } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';

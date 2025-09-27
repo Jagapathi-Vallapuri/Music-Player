@@ -10,26 +10,26 @@ import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
 import { UIProvider } from './context/UIContext.jsx';
 
 const AppWrapper = () => {
-  const { theme } = useTheme();
-  
-  return (
-    <MUIThemeProvider theme={theme}>
-      <CssBaseline />
-      <ErrorBoundary>
-        <App />
-      </ErrorBoundary>
-    </MUIThemeProvider>
-  );
+    const { theme } = useTheme();
+
+    return (
+        <MUIThemeProvider theme={theme}>
+            <CssBaseline />
+            <ErrorBoundary>
+                <App />
+            </ErrorBoundary>
+        </MUIThemeProvider>
+    );
 };
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <ThemeProvider>
-      <UIProvider>
-        <PlayerProvider>
-          <AppWrapper />
-        </PlayerProvider>
-      </UIProvider>
-    </ThemeProvider>
-  </StrictMode>,
+    <StrictMode>
+        <ThemeProvider>
+            <UIProvider>
+                <PlayerProvider>
+                    <AppWrapper />
+                </PlayerProvider>
+            </UIProvider>
+        </ThemeProvider>
+    </StrictMode>,
 )

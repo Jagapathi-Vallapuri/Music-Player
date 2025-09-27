@@ -30,7 +30,6 @@ const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
 
 app.use(cors({
   origin: (origin, callback) => {
-    // allow non-browser requests (no origin) and allowed origins
     if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
@@ -43,7 +42,6 @@ app.use(cors({
 
 app.use(generalLimiter);
 
-// Serve uploaded assets (e.g., avatars, playlist covers)
 app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const authRoutes = require('./routes/authRoutes');

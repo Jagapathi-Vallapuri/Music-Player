@@ -3,7 +3,6 @@ const cache = require('./cacheService');
 const JAMENDO_API_BASE = 'https://api.jamendo.com/v3.0/';
 const CLIENT_ID = process.env.JAMENDO_CLIENT_ID;
 
-// Ensure a Jamendo client ID is configured; throw a clear, actionable error if missing
 const ensureClient = () => {
     if (!CLIENT_ID) {
         const err = new Error('JAMENDO_CLIENT_ID is not set. Please configure your Jamendo client id in the backend environment.');
@@ -38,7 +37,6 @@ const searchTracks = (query) => {
                 format: 'json',
                 limit: 20,
                 namesearch: query,
-                // Jamendo expects mp31/mp32/ogg/flac; mp32 is good quality VBR
                 audioformat: 'mp32',
                 include: 'musicinfo'
             },
@@ -74,12 +72,10 @@ const getTrackById = (id) => {
 };
 
 const getPopular = () => {
-    // Try weekly listens first; if empty, fall back to popularity_week, then popularity_total
     return withCache('popular:auto', async () => {
         ensureClient();
         const orders = ['listens_week', 'popularity_week', 'popularity_total'];
         for (const order of orders) {
-            // eslint-disable-next-line no-await-in-loop
             const response = await axios.get(`${JAMENDO_API_BASE}tracks`, {
                 params: {
                     client_id: CLIENT_ID,
@@ -108,9 +104,7 @@ const getPopular = () => {
     })), 900);
 };
 
-// Fetch top albums per category (genre) using tracks API grouped by album
-// categories: array of strings e.g., ['rock','pop']
-// per: number per category
+
 const getAlbumsByCategories = (categories = [], per = 5) => {
     const cats = (Array.isArray(categories) ? categories : String(categories).split(',')).map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
     const key = `albums:bycat:${cats.join('|')}:${per}`;

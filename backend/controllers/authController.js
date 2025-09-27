@@ -17,7 +17,6 @@ const register = async (req, res) => {
         const newUser = new User({ username, email, password: hashedPassword, isVerified: false });
         await newUser.save();
 
-        // Initiate 2FA for registration (no token yet)
         const sessionId = randomUUID();
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         await cache.set(`2fa:session:${sessionId}`, JSON.stringify({ code, email, purpose: 'register' }), 300);

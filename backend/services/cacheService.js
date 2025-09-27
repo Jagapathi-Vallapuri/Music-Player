@@ -1,8 +1,7 @@
 const useMemory = (process.env.CACHE_DRIVER === 'memory') || (process.env.DISABLE_REDIS === 'true');
 
 if (useMemory) {
-  // Simple in-memory cache with TTL support (test/dev use)
-  const store = new Map(); // key -> { value, expiresAt }
+  const store = new Map();
 
   const now = () => Date.now();
   const getEntry = (key) => {
@@ -28,7 +27,6 @@ if (useMemory) {
       store.delete(key);
     },
     async eval() {
-      // Not implemented for memory cache; return null
       return null;
     }
   };
@@ -100,7 +98,6 @@ if (useMemory) {
         console.error('Redis del error', err);
       }
     },
-    // Eval a Lua script with keys and args (helper for atomic operations)
     async eval(script, keys = [], args = []) {
       if (!redisConnected) return null;
       try {

@@ -3,7 +3,6 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Box, CircularProgress } from '@mui/material';
 
-// Protected wrapper that waits for auth bootstrap before deciding redirect
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, authLoading } = useAuth();
 

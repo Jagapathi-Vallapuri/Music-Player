@@ -1,7 +1,6 @@
 import React from 'react';
 import { Container, Box } from '@mui/material';
 
-// Generic layout wrapper to standardize vertical spacing and scroll area
 const Layout = ({ maxWidth = 'md', children, center = false }) => {
   return (
     <Container maxWidth={maxWidth} sx={{ pt: 6, pb: 10 }}>

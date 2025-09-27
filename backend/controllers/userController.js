@@ -7,14 +7,12 @@ const fs = require('fs');
 const mongoose = require('mongoose');
 const { GridFSBucket, ObjectId } = require('mongodb');
 
-// Shared GridFS bucket for uploads (songs, images)
 const conn = mongoose.connection;
 let bucket;
 conn.once('open', () => {
     bucket = new GridFSBucket(conn.db, { bucketName: 'uploads' });
 });
 
-// Multer in-memory storage for avatars (to stream into GridFS)
 const storage = multer.memoryStorage();
 
 const imageFileFilter = (req, file, cb) => {
@@ -28,7 +26,7 @@ const upload = multer({ storage, limits: { fileSize: 2 * 1024 * 1024 }, fileFilt
 
 const updateUserAndClearCache = async (userId, update) => {
     await User.findByIdAndUpdate(userId, update);
-    await cache.del(`user:${userId}`); // Use del instead of set with null
+    await cache.del(`user:${userId}`);
 };
 
 const addTrackToHistory = async (req, res) => {
@@ -80,11 +78,10 @@ const removeFromFavorites = async (req, res) => {
 
 const createPlaylist = async (req, res) => {
     try {
-    const { name, tracks, coverUrl, description } = req.body;
+        const { name, tracks, coverUrl, description } = req.body;
         const userId = req.user._id;
-    // If description is missing or blank, omit it so Mongoose default applies
-    const desc = (typeof description === 'string' && description.trim().length > 0) ? description : undefined;
-    const playlist = new Playlist({ userId, name, tracks, coverUrl, description: desc });
+        const desc = (typeof description === 'string' && description.trim().length > 0) ? description : undefined;
+        const playlist = new Playlist({ userId, name, tracks, coverUrl, description: desc });
         await playlist.save();
         await updateUserAndClearCache(userId, { $push: { playlists: playlist._id } });
         res.status(201).json(playlist);
@@ -156,7 +153,7 @@ const uploadAvatar = async (req, res) => {
         // Remove old avatar from GridFS if exists
         const oldUser = await User.findById(req.user._id).select('avatarGridfsId');
         if (oldUser?.avatarGridfsId) {
-            try { await bucket.delete(new ObjectId(oldUser.avatarGridfsId)); } catch (_) {}
+            try { await bucket.delete(new ObjectId(oldUser.avatarGridfsId)); } catch (_) { }
         }
 
         const ext = path.extname(req.file.originalname) || '';
@@ -204,11 +201,11 @@ const deleteAvatar = async (req, res) => {
         const user = await User.findById(req.user._id).select('avatarGridfsId avatarFilename');
         if (!user) return res.status(404).json({ message: 'Avatar not set' });
         if (user.avatarGridfsId && bucket) {
-            try { await bucket.delete(new ObjectId(user.avatarGridfsId)); } catch (_) {}
+            try { await bucket.delete(new ObjectId(user.avatarGridfsId)); } catch (_) { }
         } else if (user.avatarFilename) {
             // disk fallback cleanup
             const filePath = path.join(__dirname, '..', 'uploads', 'avatars', user.avatarFilename);
-            if (fs.existsSync(filePath)) { try { fs.unlinkSync(filePath); } catch (_) {} }
+            if (fs.existsSync(filePath)) { try { fs.unlinkSync(filePath); } catch (_) { } }
         }
         await updateUserAndClearCache(req.user._id, { $unset: { avatarFilename: '', avatarMimeType: '', avatarGridfsId: '' } });
         res.json({ message: 'Avatar removed' });
@@ -272,11 +269,9 @@ module.exports.setPlaylistCover = async (req, res) => {
         if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
         const playlist = await Playlist.findOne({ _id: id, userId: req.user._id });
         if (!playlist) return res.status(404).json({ message: 'Playlist not found or unauthorized' });
-        // Delete old GridFS cover if exists
         if (playlist.coverGridfsId) {
-            try { await bucket.delete(new ObjectId(playlist.coverGridfsId)); } catch (_) {}
+            try { await bucket.delete(new ObjectId(playlist.coverGridfsId)); } catch (_) { }
         }
-        // Remove any old disk cover referenced by legacy coverUrl
         if (playlist.coverUrl && playlist.coverUrl.includes('/api/uploads/')) {
             try {
                 const rel = playlist.coverUrl.split('/api/uploads/')[1];
@@ -284,7 +279,7 @@ module.exports.setPlaylistCover = async (req, res) => {
                     const full = path.join(__dirname, '..', 'uploads', rel);
                     if (fs.existsSync(full)) fs.unlinkSync(full);
                 }
-            } catch (_) {}
+            } catch (_) { }
         }
 
         const ext = path.extname(req.file.originalname) || '';
@@ -293,7 +288,6 @@ module.exports.setPlaylistCover = async (req, res) => {
         up.end(req.file.buffer);
         await new Promise((resolve, reject) => { up.on('finish', resolve); up.on('error', reject); });
 
-        // Public stream endpoint for playlist covers
         const coverUrl = `/api/images/playlist/${encodeURIComponent(String(playlist._id))}`;
         playlist.coverUrl = coverUrl;
         playlist.coverFilename = filename;

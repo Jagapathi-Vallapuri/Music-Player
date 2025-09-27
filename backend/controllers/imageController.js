@@ -11,7 +11,6 @@ conn.once('open', () => {
   bucket = new GridFSBucket(conn.db, { bucketName: 'uploads' });
 });
 
-// Public: GET /api/images/playlist/:id -> playlist cover
 const getPlaylistCover = async (req, res) => {
   try {
     const { id } = req.params;
@@ -51,7 +50,6 @@ const getMyAvatar = async (req, res) => {
         return res.status(500).json({ message: 'Failed to stream avatar', error: e.message });
       }
     }
-    // Fallback to disk file if exists (migration support)
     if (user.avatarFilename) {
       const avatarsDir = path.join(__dirname, '..', 'uploads', 'avatars');
       const filePath = path.join(avatarsDir, user.avatarFilename);

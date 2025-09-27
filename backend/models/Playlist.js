@@ -5,7 +5,6 @@ const playlistSchema = new mongoose.Schema({
   name: { type: String, required: true },
   tracks: [String],
   coverUrl: { type: String },
-  // GridFS-backed cover image (optional)
   coverFilename: { type: String },
   coverMimeType: { type: String },
   coverGridfsId: { type: mongoose.Schema.Types.ObjectId },

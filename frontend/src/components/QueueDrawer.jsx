@@ -7,7 +7,6 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import { usePlayer } from '../context/PlayerContext.jsx';
 
-// Lightweight drag-reorder without external deps
 export default function QueueDrawer({ open, onClose }) {
   const { queue, index, move, removeAt, playAt, clearQueue, togglePlay, playing } = usePlayer();
   const [dragIndex, setDragIndex] = useState(null);

@@ -79,7 +79,6 @@ export const verify2FA = async (email, code, type = 'login', sessionId = undefin
     }
 };
 
-// Profile helpers
 export const getMe = async () => {
     try {
         const res = await api.get('/users/me');
@@ -129,7 +128,6 @@ export const changePassword = async (currentPassword, newPassword) => {
 
 export default api;
 
-// Songs API helpers
 export const uploadUserSong = async ({ file, cover, title }) => {
     const form = new FormData();
     form.append('song', file);
@@ -149,7 +147,6 @@ export const deleteMySong = async (filename) => {
     return res.data;
 };
 
-// Favorites & History API helpers
 export const getFavorites = async () => {
     const res = await api.get('/users/favorites');
     return res.data;

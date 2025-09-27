@@ -83,7 +83,7 @@ const Home = () => {
                 } else {
                     setHistory({ loading: false, items: [] });
                 }
-            } catch (_) {}
+            } catch (_) { }
         };
         fetchAll();
         return () => ac.abort();
@@ -94,7 +94,7 @@ const Home = () => {
         if (!id) return;
         try {
             if (makeFav) await apiAddFavorite(id); else await apiRemoveFavorite(id);
-            setFavorites((s) => ({ ...s, ids: makeFav ? Array.from(new Set([...(s.ids||[]), id])) : (s.ids||[]).filter(x => x !== id) }));
+            setFavorites((s) => ({ ...s, ids: makeFav ? Array.from(new Set([...(s.ids || []), id])) : (s.ids || []).filter(x => x !== id) }));
         } catch (e) {
             toastError(e?.response?.data?.message || 'Failed to update favorite');
         }
@@ -128,26 +128,26 @@ const Home = () => {
                             {[...Array(5)].map((_, i) => (<Skeleton key={i} variant="rectangular" width={200} height={220} />))}
                         </Stack>
                     ) : (
-                                    <Carousel ariaLabel="popular-tracks">
-                                        {popular.data.map((t, idx) => {
-                                            const track = {
-                                                id: t.id || t.track_id || t.title,
-                                                title: t.title || t.name,
-                                                artist: t.artist_name || t.artist,
-                                                image: t.image,
-                                                audioUrl: t.audioUrl || t.audio || t.preview_url,
-                                            };
-                                            return (
-                                                <TrackCard
-                                                    key={track.id}
-                                                    track={track}
-                                                    onPlay={() => playClicked(track)}
-                                                    isFavorite={favorites.ids.includes(track.id)}
-                                                    onToggleFavorite={(tr, makeFav) => toggleFavorite(tr, makeFav)}
-                                                />
-                                            );
-                                        })}
-                                    </Carousel>
+                        <Carousel ariaLabel="popular-tracks">
+                            {popular.data.map((t, idx) => {
+                                const track = {
+                                    id: t.id || t.track_id || t.title,
+                                    title: t.title || t.name,
+                                    artist: t.artist_name || t.artist,
+                                    image: t.image,
+                                    audioUrl: t.audioUrl || t.audio || t.preview_url,
+                                };
+                                return (
+                                    <TrackCard
+                                        key={track.id}
+                                        track={track}
+                                        onPlay={() => playClicked(track)}
+                                        isFavorite={favorites.ids.includes(track.id)}
+                                        onToggleFavorite={(tr, makeFav) => toggleFavorite(tr, makeFav)}
+                                    />
+                                );
+                            })}
+                        </Carousel>
                     )}
                 </Stack>
 
