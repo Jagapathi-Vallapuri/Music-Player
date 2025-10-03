@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import { login } from '../../client.js';
@@ -15,6 +15,13 @@ const Login = () => {
     const navigate = useNavigate();
     const auth = useAuth();
     const { toastError, toastSuccess } = useUI();
+
+    // If the user is already authenticated, send them to /home
+    useEffect(() => {
+        if (auth?.isAuthenticated) {
+            navigate('/home');
+        }
+    }, [auth?.isAuthenticated, navigate]);
 
     const handleLogin = async ({ email: eEmail, password }) => {
         setMsg(null);
