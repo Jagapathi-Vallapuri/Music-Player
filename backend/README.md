@@ -25,7 +25,12 @@ JWT_SECRET=<strong-jwt-secret>
 REDIS_URL=redis://localhost:6379
 PORT=5000
 
-# SMTP for 2FA emails
+# Email (2FA and notifications)
+# SendGrid-first (recommended on PaaS), SMTP as fallback
+SENDGRID_API_KEY=your-sendgrid-api-key
+SENDGRID_FROM="Pulse <no-reply@yourdomain.com>"
+
+# SMTP fallback (optional; ports may be blocked on PaaS)
 SMTP_HOST=smtp.example.com
 SMTP_PORT=465
 SMTP_SECURE=true
@@ -43,6 +48,8 @@ JAMENDO_CLIENT_ID=<your-jamendo-client-id>
 Notes:
 - The server validates required env vars at startup and will exit with a message if `MONGO_URL` or `JWT_SECRET` are missing.
 - Prefer `REDIS_URL` for cloud providers (use `rediss://` for TLS).
+- Email: Use SendGrid Web API with a Verified Sender or Domain for reliable delivery on cloud hosts. If SendGrid fails (e.g., 403 due to missing verification), the code will attempt SMTP as a fallback if configured.
+- Proxy: `app.set('trust proxy', 1)` is enabled to honor `X-Forwarded-For` and related headers behind a load balancer or proxy (e.g., Render), fixing IP-based rate limiter issues.
 
 ## Running
 
@@ -138,12 +145,38 @@ For full details of each route and payloads, inspect the `routes/` and `controll
 - Keep `JWT_SECRET` strong and rotate it periodically if feasible.
 - Do not commit `.env` to source control. Use a secrets manager for production deployments.
 - Streaming stability: The audio proxy and GridFS streaming endpoints register `close`/`aborted`/`error` handlers to unpipe and destroy streams promptly when the client disconnects, and cancel upstream requests where applicable. This prevents file descriptor and memory leaks during partial downloads.
+- Outbound SMTP: Many hosts block SMTP ports (25/465/587). Prefer SendGrid Web API on port 443. If you must use SMTP, ensure your provider permits it and that your environment can reach the SMTP host.
 
 ## Troubleshooting
 
 - If the server exits on startup, check env var validation output for the missing variable.
 - If email 2FA messages are not arriving, validate SMTP settings and check `emailService.js` logs.
 - For Redis issues, verify `REDIS_URL` connectivity and that the Redis server supports EVAL commands (standard Redis does).
+- SendGrid 403: Verify you created a Restricted API Key with "Mail Send" permission and have a Verified Sender or Domain in SendGrid. Also set `SENDGRID_FROM` to that verified address.
+- CORS blocked: Ensure `FRONTEND_ORIGIN` includes your exact frontend origin(s). Multiple origins can be comma-separated.
+
+## Deploying on Render
+
+Backend (Web Service):
+- Root: `backend`
+- Build Command: `npm install`
+- Start Command: `node server.js`
+- Health Check Path: `/api/health`
+- Environment Variables:
+	- Required: `MONGO_URL`, `JWT_SECRET`, `JAMENDO_CLIENT_ID`
+	- CORS: `FRONTEND_ORIGIN` (set to your Static Site URL)
+	- Email: `SENDGRID_API_KEY`, `SENDGRID_FROM` (recommended), optional `SMTP_*` for fallback
+- Notes:
+	- Add Render egress IPs to MongoDB Atlas allowlist if Atlas is used.
+	- Trust proxy is enabled; rate limiter uses forwarded IP.
+	- SMTP may be blocked; prefer SendGrid.
+
+Frontend (Static Site):
+- Root: `frontend`
+- Build Command: `npm install && npm run build`
+- Publish Directory: `dist`
+- Environment: `VITE_API_BASE_URL=https://<your-backend>.onrender.com/api`
+- After deploy, set backend `FRONTEND_ORIGIN` to this Static Site origin.
 
 ## Jamendo API configuration and audio proxy
 

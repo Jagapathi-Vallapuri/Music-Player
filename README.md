@@ -52,7 +52,7 @@ frontend/
 - MongoDB connection string (Atlas or self-hosted)
 - Jamendo API Client ID
 - Redis (optional but recommended for caching; app runs even if Redis is unavailable)
-- SMTP account (optional; required for email 2FA/password flows)
+- Email provider (SendGrid recommended). SMTP account optional (used only as fallback) for email 2FA/password flows.
 
 ## Quick Start (Local)
 1) Backend
@@ -86,7 +86,12 @@ REDIS_PORT=6379
 # REDIS_USERNAME=default
 # REDIS_PASSWORD=your-redis-password
 
-# SMTP (required only for email 2FA/password flows)
+# Email: SendGrid-first (recommended), SMTP fallback (optional)
+# SendGrid (recommended for cloud hosts; uses HTTPS port 443)
+SENDGRID_API_KEY=your-sendgrid-api-key
+SENDGRID_FROM="Pulse <no-reply@yourdomain.com>"
+
+# SMTP (fallback only; many hosts block outbound SMTP ports)
 SMTP_HOST=smtp.example.com
 SMTP_PORT=465
 SMTP_SECURE=true
@@ -98,6 +103,7 @@ Notes:
 - If Redis connects successfully, Jamendo responses are cached.
 - If Redis is unreachable, cache gracefully disables; the app still functions (with direct API calls).
  - Playback is proxied through the backend to bypass Jamendo storage CORS. The API exposes `/api/music/stream?src=<jamendo-audio-url>` with Range support.
+ - Email: In production on most PaaS hosts, prefer SendGrid’s Web API with a Verified Sender or Domain. SMTP often times out due to blocked ports.
 
 ### Install & Run
 Backend (port 5000):
@@ -213,6 +219,32 @@ Dev Scripts
 - Backend: Run Node server (PM2/systemd/Docker) with `.env` configured; expose port 5000 (or set `PORT`)
 - Configure CORS `FRONTEND_ORIGIN` to your deployed frontend URL
 - Ensure MongoDB, Redis (optional), and SMTP (optional) services are reachable
+
+## Deployment on Render
+Render works well with this monorepo. Use a Web Service for the backend and a Static Site for the frontend.
+
+Backend (Web Service):
+- Root: `backend`
+- Build Command: `npm install`
+- Start Command: `node server.js`
+- Health Check: `/api/health` (expects JSON `{ success: true }`)
+- Environment Variables:
+  - MONGO_URL, JWT_SECRET, JAMENDO_CLIENT_ID
+  - FRONTEND_ORIGIN: set to your Static Site URL(s), e.g. `https://pulse-frontend.onrender.com`
+  - SENDGRID_API_KEY, SENDGRID_FROM (recommended) and optionally SMTP_* for fallback
+- Notes:
+  - Express is configured with `app.set('trust proxy', 1)` to work correctly behind Render’s proxy (rate limiter and IP extraction).
+  - If using MongoDB Atlas, add Render egress IPs to your Atlas Network Access allowlist.
+  - SMTP ports are commonly blocked on PaaS; prefer SendGrid Web API.
+
+Frontend (Static Site):
+- Root: `frontend`
+- Build Command: `npm install && npm run build`
+- Publish Directory: `dist`
+- Environment: set `VITE_API_BASE_URL` (in Render Static Site environment) to your backend URL, e.g. `https://pulse-backend.onrender.com/api`
+- After deploy, update backend `FRONTEND_ORIGIN` to this static site origin for CORS.
+
+Optional `render.yaml` (monorepo) can be added to codify both services. If you want, we can generate one tailored to your Render account naming.
 
 ## Troubleshooting
 - 401 Unauthorized on `/auth/validate`: ensure requests include `Authorization: Bearer <token>`; login/2FA must complete successfully to obtain a token
